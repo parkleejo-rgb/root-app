@@ -4939,23 +4939,55 @@ function openTrainingPlanEditor() {
 function renderTrainingPlanEditorBody(body) {
   const s         = Store.getSettings();
   const splitDays = getSplitDays(s);
+  const currentSplit = s.trainingSplit || 'full_body';
+
+  const PRESETS = [
+    { id: 'full_body',   label: 'Full Body' },
+    { id: 'upper_lower', label: 'Upper / Lower' },
+    { id: 'ppl',         label: 'Push / Pull / Legs' },
+    { id: 'ppl_ul',      label: 'PPL + Upper / Lower' },
+    { id: 'custom',      label: 'Custom' },
+  ];
 
   body.innerHTML = `
     <div class="modal-title">Training Split</div>
-    <p class="text-muted text-small mb-16">These are the day types shown when you check off your training habit.</p>
-    <div id="split-day-list">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      ${PRESETS.map(p => `
+        <button class="training-split-preset-btn${currentSplit === p.id ? ' active' : ''}" data-preset="${p.id}"
+          style="padding:7px 14px;border-radius:20px;border:1.5px solid ${currentSplit === p.id ? 'var(--sage)' : '#ddd'};background:${currentSplit === p.id ? 'var(--sage)' : 'transparent'};color:${currentSplit === p.id ? '#fff' : 'var(--text)'};font-size:13px;font-weight:500;cursor:pointer">
+          ${p.label}
+        </button>
+      `).join('')}
+    </div>
+    <div id="split-day-list" style="${currentSplit !== 'custom' ? 'display:none' : ''}">
+      <p class="text-muted text-small mb-8">Add, rename, or remove your custom day types.</p>
       ${splitDays.map((d, i) => `
         <div class="split-day-row" data-idx="${i}" data-id="${escHtml(d.id)}">
           <input class="form-input split-day-input" type="text" value="${escHtml(d.name)}" maxlength="20" style="flex:1">
           <button class="btn btn-sm btn-outline split-day-delete" data-idx="${i}" style="flex-shrink:0;margin-left:8px">Remove</button>
         </div>
       `).join('')}
+      <button class="btn btn-outline btn-full mt-12" id="split-add-day">+ Add day type</button>
     </div>
-    <button class="btn btn-outline btn-full mt-12" id="split-add-day">+ Add day type</button>
     <button class="btn btn-primary btn-full mt-8" id="split-save">Save</button>
   `;
 
-  body.querySelector('#split-add-day').addEventListener('click', () => {
+  let selectedPreset = currentSplit;
+
+  body.querySelectorAll('.training-split-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedPreset = btn.dataset.preset;
+      body.querySelectorAll('.training-split-preset-btn').forEach(b => {
+        const active = b.dataset.preset === selectedPreset;
+        b.style.background = active ? 'var(--sage)' : 'transparent';
+        b.style.color      = active ? '#fff' : 'var(--text)';
+        b.style.borderColor = active ? 'var(--sage)' : '#ddd';
+      });
+      body.querySelector('#split-day-list').style.display = selectedPreset === 'custom' ? '' : 'none';
+    });
+  });
+
+  body.querySelector('#split-add-day')?.addEventListener('click', () => {
     const list = body.querySelector('#split-day-list');
     const idx  = list.querySelectorAll('.split-day-row').length;
     const row  = document.createElement('div');
@@ -4966,30 +4998,32 @@ function renderTrainingPlanEditorBody(body) {
       <input class="form-input split-day-input" type="text" placeholder="e.g. Push" maxlength="20" style="flex:1">
       <button class="btn btn-sm btn-outline split-day-delete" data-idx="${idx}" style="flex-shrink:0;margin-left:8px">Remove</button>
     `;
-    list.appendChild(row);
+    list.insertBefore(row, body.querySelector('#split-add-day'));
     row.querySelector('input').focus();
-    // bind delete on new row
     row.querySelector('.split-day-delete').addEventListener('click', () => row.remove());
   });
 
-  // Bind delete on existing rows
   body.querySelectorAll('.split-day-delete').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.split-day-row').remove());
   });
 
   body.querySelector('#split-save').addEventListener('click', () => {
-    const rows = body.querySelectorAll('.split-day-row');
-    const newDays = [];
-    rows.forEach((row, i) => {
-      const name = row.querySelector('.split-day-input').value.trim();
-      if (!name) return;
-      const id = row.dataset.id || ('custom_' + i);
-      newDays.push({ id, name });
-    });
-    if (!newDays.length) { showToast('Add at least one day type'); return; }
     const s2 = Store.getSettings();
-    s2.trainingSplit   = 'custom';
-    s2.customSplitDays = newDays;
+    if (selectedPreset === 'custom') {
+      const rows = body.querySelectorAll('.split-day-row');
+      const newDays = [];
+      rows.forEach((row, i) => {
+        const name = row.querySelector('.split-day-input').value.trim();
+        if (!name) return;
+        const id = row.dataset.id || ('custom_' + i);
+        newDays.push({ id, name });
+      });
+      if (!newDays.length) { showToast('Add at least one day type'); return; }
+      s2.trainingSplit   = 'custom';
+      s2.customSplitDays = newDays;
+    } else {
+      s2.trainingSplit = selectedPreset;
+    }
     Store.saveSettings(s2);
     closeModal();
     showToast('Training split saved');
