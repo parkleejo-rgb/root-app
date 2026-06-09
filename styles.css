@@ -2209,3 +2209,98 @@ textarea.form-input {
   color: var(--text);
   font-weight: 500;
 }
+
+/* ── Training Plan UI ── */
+.training-split-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.training-split-btn {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.training-split-btn:active {
+  background: var(--sage-light);
+  border-color: var(--sage);
+}
+.training-split-rest {
+  color: var(--text-muted);
+  font-weight: 400;
+  border-style: dashed;
+}
+
+/* Training week card */
+.training-split-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.training-split-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.training-split-label {
+  font-weight: 500;
+  color: var(--text);
+}
+.training-split-status.done {
+  color: var(--sage);
+}
+.training-split-status.pending {
+  color: var(--text-light);
+  font-style: italic;
+}
+.training-target-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.training-context-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Split day editor */
+.split-day-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 8px;
+}
+
+/* Settings stepper */
+.stepper-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-dark);
+  background: var(--surface-2);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.stepper-btn:active {
+  background: var(--sage-light);
+}

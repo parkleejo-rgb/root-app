@@ -51,7 +51,7 @@ const DEFAULT_HABITS = [
   { id: 'nutr_no_junk',    label: 'No processed meat today',                     pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'nutr_nuts',       label: 'Nuts or legumes today',                       pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   // Training
-  { id: 'train_plan',      label: 'Followed my training plan today',             pillar: 'training',  weight: 4, points: 3, retroactive: false, opensWorkout: true,  priority: true  },
+  { id: 'train_plan',      label: 'Followed my training plan today',             pillar: 'training',  weight: 4, points: 3, retroactive: false, opensWorkout: false, priority: true  },
   { id: 'train_movement',  label: 'Movement floor hit today',                    pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'train_cardio',    label: 'Cardio or conditioning session',              pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: true,  priority: false },
   { id: 'train_mobility',  label: 'Mobility or stretching',                      pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'recovery', alsoWeight: 1 },
@@ -115,7 +115,8 @@ const CORE_HABIT_PUSHBACK = {
   nutr_protein: "Protein is one of the most consistently supported nutritional levers for recomposition -- particularly for preserving lean mass during fat loss. Are you sure?",
   nutr_fiber:   "Soluble fiber has strong evidence for LDL reduction, one of the most effective dietary interventions for high cholesterol. Are you sure?",
   nutr_heart:   "Heart-healthy eating patterns are the primary dietary lever for cardiovascular risk alongside medication. Are you sure?",
-  sleep_bed:    "Sleep restriction reduces muscle protein synthesis and impairs recovery. It is a meaningful lever for both body composition and cardiovascular health. Are you sure?",
+  sleep_bed:      "Sleep restriction reduces muscle protein synthesis and impairs recovery. It is a meaningful lever for both body composition and cardiovascular health. Are you sure?",
+  train_movement: "Low-intensity daily movement contributes independently to cardiovascular health and total energy expenditure. It requires very little recovery cost. Are you sure?",
 };
 
 const BADGE_DEFINITIONS = [
@@ -190,6 +191,10 @@ const DEFAULT_SETTINGS = {
   mode: 'weight_loss', // 'weight_loss' | 'maintenance'
 };
 
+function calculateProteinTarget(weightLbs) {
+  return Math.round((weightLbs * 0.85) / 5) * 5;
+}
+
 /* ─── Storage Layer ──────────────────────────────────────────────────────── */
 
 const Store = {
@@ -215,6 +220,12 @@ const Store = {
 
   getWorkouts()        { return this.get('workouts', []); },
   saveWorkouts(a)      { this.set('workouts', a); SheetsSync.schedule(); },
+
+  getTrainingSelections()    { return this.get('training_selections', {}); },
+  saveTrainingSelections(d)  { this.set('training_selections', d); },
+
+  getCardioLogs()            { return this.get('cardio_logs', []); },
+  saveCardioLogs(a)          { this.set('cardio_logs', a); SheetsSync.schedule(); },
 
   getSleepLogs()       { return this.get('sleep_logs', []); },
   saveSleepLogs(a)     { this.set('sleep_logs', a); },
@@ -300,6 +311,25 @@ const Store = {
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
+    });
+
+    // Dynamic labels: resolve settings-dependent placeholders
+    const s = this.getSettings();
+    migrated = migrated.map(h => {
+      if (h.id === 'nutr_protein') {
+        const g = s.proteinTargetG;
+        const base = 'Hit protein target today';
+        return { ...h, label: g ? `${base} (${g}g)` : base };
+      }
+      if (h.id === 'sleep_bed') {
+        const t = s.bedtimeTarget || '22:30';
+        const [hh, mm] = t.split(':').map(Number);
+        const period = hh < 12 ? 'am' : 'pm';
+        const h12 = hh % 12 || 12;
+        const label = mm === 0 ? `In bed by ${h12}${period}` : `In bed by ${h12}:${String(mm).padStart(2,'0')}${period}`;
+        return { ...h, label };
+      }
+      return h;
     });
 
     return migrated;
@@ -941,11 +971,11 @@ function _plateauStep3(body) {
 
 function _plateauStep4(body, barrier) {
   const RESPONSES = {
-    busy:    'Pick one core habit to protect this week. Just one. Let everything else be bonus.',
-    motiv:   'Motivation follows action, not the other way around. Start with your easiest core habit for three days.',
-    right:   'Your body is adapting. Try adding one strength session or increasing protein slightly. Give it two more weeks before changing anything else.',
-    slipped: 'Pick your two most important core habits and focus only on those this week. Simplify, don\'t abandon.',
-    unsure:  'Look at your lowest domain bar. That\'s usually where the answer is.',
+    busy:    "Pick one core habit to protect this week. If it has to be one, make it protein. Everything else is secondary.",
+    motiv:   "Motivation follows action. Hit your protein target and one training session for three days. Momentum tends to rebuild from there.",
+    right:   "Body recomposition is slow. If you're gaining strength and habits are consistent, physical changes are likely happening even if the scale isn't moving. Give it four more weeks before changing anything.",
+    slipped: "Protein and training. Those two first. Everything else is bonus until you're back in rhythm.",
+    unsure:  "Look at your Training and Nutrition domain bars. That's almost always where the answer is for body recomposition.",
   };
   const intentions = [
     'Go to bed earlier',
@@ -2211,9 +2241,16 @@ function renderToday() {
   screen.querySelectorAll('.habit-item').forEach(item => {
     const id = item.dataset.habit;
 
-    // Checkbox zone: toggle check
+    // Checkbox zone: toggle check (train_plan gets split-picker instead)
     item.querySelector('.habit-check-zone')?.addEventListener('click', e => {
       e.stopPropagation();
+      if (id === 'train_plan') {
+        const todayChecked = Store.getHabits(todayStr());
+        if (!todayChecked['train_plan']) {
+          openTrainingPlanPicker(item, todayStr());
+          return;
+        }
+      }
       toggleHabit(item);
     });
 
@@ -2347,6 +2384,76 @@ function toggleHabit(item) {
   }
 }
 
+function openTrainingPlanPicker(item, date) {
+  const settings  = Store.getSettings();
+  const splitDays = getSplitDays(settings);
+
+  openModal(body => {
+    body.innerHTML = `
+      <div class="modal-title">What's today?</div>
+      <div class="training-split-grid">
+        ${splitDays.map(d => `
+          <button class="training-split-btn" data-split-id="${d.id}" data-split-name="${escHtml(d.name)}">
+            ${escHtml(d.name)}
+          </button>
+        `).join('')}
+        <button class="training-split-btn training-split-rest" data-split-id="rest" data-split-name="Rest day">
+          Rest day / Easy movement
+        </button>
+      </div>
+    `;
+
+    body.querySelectorAll('.training-split-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const splitId   = btn.dataset.splitId;
+        const splitName = btn.dataset.splitName;
+
+        // Save selection for the day
+        const selections = Store.getTrainingSelections();
+        selections[date] = { splitDay: splitId, splitDayName: splitName };
+        Store.saveTrainingSelections(selections);
+
+        // Check off the habit and award points
+        const checked = Store.getHabits(date);
+        if (!checked['train_plan']) {
+          checked['train_plan'] = true;
+          Store.saveHabits(date, checked);
+          item.classList.add('checked');
+          const habit = Store.getHabitDefs().find(h => h.id === 'train_plan');
+          if (habit) {
+            Points.add(habit.points, `Habit: ${habit.label}`);
+            updatePointsBadge();
+            showToast(`+${habit.points} pts`, 'success');
+            const newBadges = Badges.check();
+            if (newBadges.length) setTimeout(() => Badges.showCelebration(newBadges), 400);
+            const newStreakBadges = Streak.checkBadges();
+            if (newStreakBadges.length) setTimeout(() => Streak.showBadgeCelebration(newStreakBadges[0]), newBadges.length ? 800 : 400);
+            updateStreakDisplay();
+          }
+        }
+
+        if (splitId === 'rest') {
+          closeModal();
+          return;
+        }
+
+        // Offer to log workout
+        body.innerHTML = `
+          <div class="modal-title">Log this workout?</div>
+          <p class="text-muted text-small mb-16">${escHtml(splitName)} session</p>
+          <button class="btn btn-primary btn-full" id="tplan-log-yes">Yes, log it</button>
+          <button class="btn btn-outline btn-full mt-8" id="tplan-log-skip">Skip for now</button>
+        `;
+        body.querySelector('#tplan-log-yes').addEventListener('click', () => {
+          closeModal();
+          setTimeout(() => openWorkoutModal('strength'), 200);
+        });
+        body.querySelector('#tplan-log-skip').addEventListener('click', closeModal);
+      });
+    });
+  });
+}
+
 /* ─── THIS WEEK Screen ───────────────────────────────────────────────────── */
 
 function renderWeek() {
@@ -2400,6 +2507,9 @@ function renderWeek() {
     ? `Day ${elapsed} tracked this week (started ${formatDateShort(appStart)})`
     : `Day ${elapsed} of 7`;
   html += `<p class="text-muted text-small mb-8">${formatWeekRange(ws)} &nbsp;·&nbsp; ${trackingNote}</p>`;
+
+  // Training week card
+  html += renderTrainingWeekCard(days, today, settings);
 
   // Pillar bars
   html += `<div class="card">`;
@@ -2586,6 +2696,92 @@ function renderSavingsBar(points, goals, settings) {
   return html;
 }
 
+/* ─── Training Plan Helpers ──────────────────────────────────────────────── */
+
+function getSplitDays(settings) {
+  if (settings.trainingSplit === 'custom' && settings.customSplitDays?.length) {
+    return settings.customSplitDays; // [{ id, name }]
+  }
+  const presets = {
+    full_body:   [{ id: 'fullbody', name: 'Full body' }],
+    upper_lower: [{ id: 'upper',  name: 'Upper' }, { id: 'lower',  name: 'Lower' }],
+    ppl:         [{ id: 'push',   name: 'Push'  }, { id: 'pull',   name: 'Pull'  }, { id: 'legs', name: 'Legs' }],
+    ppl_ul:      [{ id: 'push',   name: 'Push'  }, { id: 'pull',   name: 'Pull'  }, { id: 'legs', name: 'Legs' },
+                  { id: 'upper',  name: 'Upper' }, { id: 'lower',  name: 'Lower' }],
+  };
+  return presets[settings.trainingSplit] || [{ id: 'fullbody', name: 'Full body' }];
+}
+
+function getWeekTrainingSummary(days) {
+  const selections = Store.getTrainingSelections();
+  const result = { sessionCount: 0, byDay: {}, selections: {} };
+  days.forEach(d => {
+    const sel = selections[d];
+    if (!sel) return;
+    result.selections[d] = sel;
+    if (sel.splitDay !== 'rest') {
+      result.sessionCount++;
+      if (!result.byDay[sel.splitDay]) result.byDay[sel.splitDay] = { name: sel.splitDayName, dates: [] };
+      result.byDay[sel.splitDay].dates.push(d);
+    }
+  });
+  return result;
+}
+
+function renderTrainingWeekCard(days, today, settings) {
+  const target     = settings.weeklySessionTarget || 3;
+  const splitDays  = getSplitDays(settings);
+  const summary    = getWeekTrainingSummary(days);
+  const completed  = summary.sessionCount;
+  const remaining  = Math.max(0, target - completed);
+  const daysLeft   = days.filter(d => d > today).length;
+  const weekOver   = today > days[days.length - 1];
+  const DOW        = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  // Smart context note
+  let note;
+  if (completed >= target) {
+    note = `<span style="color:var(--sage)">Target hit this week.</span>`;
+  } else if (weekOver) {
+    note = `Missed target this week. Reset Monday.`;
+  } else if (remaining === 0) {
+    note = `<span style="color:var(--sage)">Target hit this week.</span>`;
+  } else if (remaining <= daysLeft) {
+    note = daysLeft > remaining + 1
+      ? `On track.`
+      : `${remaining} session${remaining !== 1 ? 's' : ''} remaining, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left -- still on track.`;
+  } else {
+    note = `${remaining} session${remaining !== 1 ? 's' : ''} remaining, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left -- push this week.`;
+  }
+
+  // Split rows: one row per configured split day
+  const splitRows = splitDays.map(sd => {
+    const done = summary.byDay[sd.id];
+    if (done) {
+      const dayLabels = done.dates.map(d => {
+        const idx = days.indexOf(d);
+        return `<span style="color:var(--sage);font-weight:500">${DOW[idx] ?? d}</span> ✓`;
+      }).join(', ');
+      return `<div class="training-split-row"><span class="training-split-label">${escHtml(sd.name)}</span><span class="training-split-status done">${dayLabels}</span></div>`;
+    }
+    return `<div class="training-split-row"><span class="training-split-label">${escHtml(sd.name)}</span><span class="training-split-status pending">not yet</span></div>`;
+  });
+
+  return `
+    <div class="card">
+      <div class="card-title">This Week's Training</div>
+      <div class="training-split-rows">
+        ${splitRows.join('')}
+      </div>
+      <div class="training-target-row">
+        <span>Target: <strong>${target} session${target !== 1 ? 's' : ''}</strong></span>
+        ${completed >= target ? '' : `<span class="text-muted" style="font-size:13px">${remaining} remaining</span>`}
+      </div>
+      <div class="training-context-note text-small" style="margin-top:6px;color:var(--text-muted)">${note}</div>
+    </div>
+  `;
+}
+
 function computePillarScores(activeDays, habits) {
   const scores     = {};
   const pillars    = ['sleep', 'nutrition', 'training', 'recovery'];
@@ -2623,22 +2819,22 @@ function getPillarFeedback(pillar, pct) {
     sleep: {
       high:   "Sleep discipline is on point this week.",
       mid:    "Sleep is building. Locking in the bedtime or caffeine cutoff would push this higher.",
-      low:    "Sleep is your lowest domain this week. Earlier bedtime and cutting caffeine after 1pm are the highest-leverage moves.",
+      low:    "Sleep supports training adaptation and recovery. Experimental studies suggest sleep restriction impairs muscle protein synthesis and hormonal health, though the exact effects vary. Bedtime and caffeine cutoff are the two most controllable levers.",
     },
     nutrition: {
       high:   "Solid nutrition week. Protein and whole foods are showing up consistently.",
       mid:    "Nutrition is at halfway. Hitting protein at the first two meals would move this.",
-      low:    "Nutrition is low this week. Start with protein at breakfast -- it anchors the rest of the day.",
+      low:    "Protein is the nutrition habit most directly linked to body recomposition outcomes. If one nutrition habit gets protected this week, make it the protein target.",
     },
     training: {
       high:   "Strong training week. Consistency is the variable that compounds over months.",
       mid:    "Halfway on training. One more session or movement floor day would push this higher.",
-      low:    "Training is your lowest domain this week. Even a short strength session or a 20-minute walk counts toward the habit.",
+      low:    "Two to three strength sessions per week is the minimum for meaningful adaptation. Consistency over weeks and months drives recomposition more than any single session.",
     },
     recovery: {
       high:   "Recovery is built into your week. That supports the training you're trying to adapt to.",
       mid:    "Recovery is building. Stress management and time outside are worth protecting.",
-      low:    "Recovery is low this week. One deliberate rest or stress-management habit today is a start.",
+      low:    "Recovery habits support training quality and stress management. They are secondary to training and nutrition but contribute to the whole system over time.",
     },
   };
   const f = feedbacks[pillar];
@@ -2961,10 +3157,45 @@ function renderProgress() {
     html += `</div>`;
   }
 
+  // Cardiovascular markers section
+  if (settings.featCardioMarkers) {
+    const CARDIO_MARKERS = [
+      { key: 'ldl',             label: 'LDL Cholesterol',    unit: 'mg/dL' },
+      { key: 'hdl',             label: 'HDL Cholesterol',    unit: 'mg/dL' },
+      { key: 'triglycerides',   label: 'Triglycerides',      unit: 'mg/dL' },
+      { key: 'totalCholesterol',label: 'Total Cholesterol',  unit: 'mg/dL' },
+      { key: 'bpSystolic',      label: 'BP Systolic',        unit: 'mmHg'  },
+      { key: 'bpDiastolic',     label: 'BP Diastolic',       unit: 'mmHg'  },
+      { key: 'restingHR',       label: 'Resting Heart Rate', unit: 'bpm'   },
+      { key: 'waist',           label: 'Waist',              unit: 'in'    },
+    ];
+    const cardioLogs = Store.getCardioLogs().sort((a,b) => a.date.localeCompare(b.date));
+    html += `<div class="screen-section-title">Cardiovascular Markers</div>`;
+    html += `<div class="card">`;
+    html += `<button class="btn btn-sm btn-outline" id="log-cardio-btn" style="margin-bottom:12px">Log markers</button>`;
+    html += `<p class="text-small text-muted" style="line-height:1.5;margin-bottom:8px">These ranges are for general reference. Your doctor sets your personal targets based on your full clinical picture. Medication is an effective, evidence-based tool -- habits support it, not replace it.</p>`;
+    if (cardioLogs.length === 0) {
+      html += `<div class="empty-state"><p>No markers logged yet. Tap "Log markers" to add your first entry.</p></div>`;
+    } else if (cardioLogs.length === 1) {
+      const entry = cardioLogs[0];
+      html += `<p class="text-small text-muted mb-8">${entry.date} -- add a second entry to see trend charts.</p>`;
+      CARDIO_MARKERS.forEach(m => {
+        if (entry[m.key] != null) html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:14px">${m.label}</span><span class="text-muted" style="font-size:14px">${entry[m.key]} ${m.unit}</span></div>`;
+      });
+    } else {
+      CARDIO_MARKERS.forEach(m => {
+        const hasData = cardioLogs.filter(l => l[m.key] != null).length >= 2;
+        if (hasData) html += `<div style="margin-top:14px"><div class="text-small" style="font-weight:600;margin-bottom:6px;color:var(--text)">${m.label} <span style="font-weight:400;color:var(--text-muted)">(${m.unit})</span></div><div class="chart-wrap" style="height:120px"><canvas id="cardio-chart-${m.key}"></canvas></div></div>`;
+      });
+    }
+    html += `</div>`;
+  }
+
   screen.innerHTML = html;
 
   // Plateau check-in button
   screen.querySelector('#plateau-checkin-btn')?.addEventListener('click', openPlateauCheckin);
+  screen.querySelector('#log-cardio-btn')?.addEventListener('click', openCardioLogModal);
 
   // Photo lightbox
   screen.querySelectorAll('.photo-thumb').forEach(el => {
@@ -3009,11 +3240,16 @@ function renderProgress() {
       const measurements = Store.getMeasurements().sort((a,b) => a.date.localeCompare(b.date));
       if (measurements.length > 0) initMeasurementsChart(measurements, settings);
     }
+    if (settings.featCardioMarkers) {
+      const cardioLogs = Store.getCardioLogs().sort((a,b) => a.date.localeCompare(b.date));
+      if (cardioLogs.length >= 2) initCardioCharts(cardioLogs);
+    }
   });
 }
 
-let sleepChart = null;
-let moodChart  = null;
+let sleepChart   = null;
+let moodChart    = null;
+let cardioCharts = {};
 let measurementsChart = null;
 
 function initSleepChart(logs, settings) {
@@ -3132,6 +3368,132 @@ function initMeasurementsChart(measurements, settings) {
       },
     },
   });
+}
+
+function openCardioLogModal() {
+  const today = todayStr();
+  const existing = (Store.getCardioLogs() || []).find(l => l.date === today) || {};
+  const html = `
+    <h3 style="margin:0 0 16px;font-size:17px;font-weight:600">Log Cardiovascular Markers</h3>
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">Date</label>
+      <input id="cardio-date" type="date" value="${today}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">LDL Cholesterol (mg/dL)</label>
+        <input id="cardio-ldl" type="number" placeholder="—" value="${existing.ldl ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">HDL Cholesterol (mg/dL)</label>
+        <input id="cardio-hdl" type="number" placeholder="—" value="${existing.hdl ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">Triglycerides (mg/dL)</label>
+        <input id="cardio-trig" type="number" placeholder="—" value="${existing.triglycerides ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">Total Cholesterol (mg/dL)</label>
+        <input id="cardio-total" type="number" placeholder="—" value="${existing.totalCholesterol ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">BP Systolic (mmHg)</label>
+        <input id="cardio-sys" type="number" placeholder="—" value="${existing.bpSystolic ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">BP Diastolic (mmHg)</label>
+        <input id="cardio-dia" type="number" placeholder="—" value="${existing.bpDiastolic ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">Resting Heart Rate (bpm)</label>
+        <input id="cardio-hr" type="number" placeholder="—" value="${existing.restingHR ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#666;display:block;margin-bottom:4px">Waist (inches)</label>
+        <input id="cardio-waist" type="number" step="0.1" placeholder="—" value="${existing.waist ?? ''}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+    <button id="cardio-save-btn" class="btn-primary" style="width:100%;padding:14px;font-size:15px;border-radius:10px">Save</button>
+  `;
+  openModal(html);
+  document.getElementById('cardio-save-btn')?.addEventListener('click', () => {
+    const date = document.getElementById('cardio-date').value || today;
+    const entry = { date };
+    const fields = [
+      ['ldl', 'cardio-ldl'], ['hdl', 'cardio-hdl'], ['triglycerides', 'cardio-trig'],
+      ['totalCholesterol', 'cardio-total'], ['bpSystolic', 'cardio-sys'],
+      ['bpDiastolic', 'cardio-dia'], ['restingHR', 'cardio-hr'], ['waist', 'cardio-waist'],
+    ];
+    for (const [key, id] of fields) {
+      const v = document.getElementById(id)?.value;
+      if (v !== '' && v !== null && v !== undefined) entry[key] = parseFloat(v);
+    }
+    const logs = Store.getCardioLogs().filter(l => l.date !== date);
+    logs.push(entry);
+    logs.sort((a, b) => a.date.localeCompare(b.date));
+    Store.saveCardioLogs(logs);
+    closeModal();
+    showToast('Markers logged');
+    if (currentScreen === 'progress') renderProgress();
+  });
+}
+
+function initCardioCharts(logs) {
+  if (typeof Chart === 'undefined' || !logs || logs.length < 2) return;
+  const labels = logs.map(l => l.date);
+  for (const m of CARDIO_MARKERS) {
+    const canvas = document.getElementById(`cardio-chart-${m.key}`);
+    if (!canvas) continue;
+    const data = logs.map(l => l[m.key] ?? null);
+    if (data.every(v => v === null)) continue;
+    if (cardioCharts[m.key]) { cardioCharts[m.key].destroy(); }
+
+    const plugins = [];
+    const annotations = {};
+    if (m.refMax !== null) {
+      annotations.refMax = {
+        type: 'line', yMin: m.refMax, yMax: m.refMax,
+        borderColor: 'rgba(200,80,80,0.5)', borderWidth: 1, borderDash: [4, 3],
+        label: { content: `Goal <${m.refMax}`, display: true, position: 'end', font: { size: 9 }, color: 'rgba(200,80,80,0.7)' },
+      };
+    }
+    if (m.refMin !== null) {
+      annotations.refMin = {
+        type: 'line', yMin: m.refMin, yMax: m.refMin,
+        borderColor: 'rgba(80,160,80,0.5)', borderWidth: 1, borderDash: [4, 3],
+        label: { content: `Goal >${m.refMin}`, display: true, position: 'end', font: { size: 9 }, color: 'rgba(80,160,80,0.7)' },
+      };
+    }
+
+    cardioCharts[m.key] = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: `${m.label} (${m.unit})`,
+          data,
+          borderColor: 'rgba(45,74,62,0.8)',
+          backgroundColor: 'rgba(45,74,62,0.08)',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4,
+          fill: true,
+          spanGaps: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          ...(Object.keys(annotations).length ? { annotation: { annotations } } : {}),
+        },
+        scales: {
+          x: { ticks: { maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
+          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 } } },
+        },
+      },
+    });
+  }
 }
 
 async function exportProgressPhotos() {
@@ -3358,11 +3720,51 @@ function renderSettings() {
           <input class="settings-row-input" id="s-start-date" type="date" value="${s.appStartDate || todayStr()}">
         </div>
         <div class="settings-row">
+          <div class="settings-row-label">Primary goal</div>
+          <select class="settings-row-input" id="s-primary-goal">
+            <option value="recomposition" ${(s.primaryGoal || 'recomposition') === 'recomposition' ? 'selected' : ''}>Recomposition</option>
+            <option value="build_muscle"  ${s.primaryGoal === 'build_muscle'  ? 'selected' : ''}>Build muscle</option>
+            <option value="lose_fat"      ${s.primaryGoal === 'lose_fat'      ? 'selected' : ''}>Lose fat</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-label">Age</div>
+          <input class="settings-row-input" id="s-age" type="number" placeholder="Optional" min="18" max="99" value="${s.age || ''}">
+        </div>
+        <div class="settings-row">
           <div class="settings-row-label">Current goal</div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="settings-mode-label" id="settings-mode-label">${s.mode === 'maintenance' ? 'Maintenance' : 'Weight loss'}</span>
             <button class="btn btn-sm btn-outline" id="s-switch-mode" style="font-size:12px;padding:4px 10px">${s.mode === 'maintenance' ? 'Switch to weight loss' : 'Switch to maintenance'}</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Training</div>
+      <div class="settings-group">
+        <div class="settings-row" style="align-items:center">
+          <div class="settings-row-label">Weekly session target</div>
+          <div class="stepper-row" style="display:flex;align-items:center;gap:8px">
+            <button class="stepper-btn" id="s-sessions-minus">−</button>
+            <span id="s-sessions-val" style="min-width:18px;text-align:center;font-weight:500">${s.weeklySessionTarget || 3}</span>
+            <button class="stepper-btn" id="s-sessions-plus">+</button>
+          </div>
+        </div>
+        <div class="settings-btn-row" id="s-edit-training-plan">
+          <div class="settings-btn-label">Edit training split</div>
+          <div class="settings-btn-desc">Add, rename, or remove split days</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Nutrition</div>
+      <div class="settings-group">
+        <div class="settings-btn-row" id="s-protein-target">
+          <div class="settings-btn-label">Daily protein target</div>
+          <div class="settings-btn-desc">${s.proteinTargetG ? s.proteinTargetG + 'g' : 'Not set'}</div>
         </div>
       </div>
     </div>
@@ -3439,6 +3841,10 @@ function renderSettings() {
         <div class="toggle-row" style="padding:13px 16px">
           <div><div class="toggle-label">Measurement tracking</div><div class="toggle-sublabel">Monthly body measurements with visual body model</div></div>
           <label class="toggle"><input type="checkbox" id="s-feat-measurements" ${s.featMeasurements ? 'checked' : ''}><div class="toggle-track"></div></label>
+        </div>
+        <div class="toggle-row" style="padding:13px 16px">
+          <div><div class="toggle-label">Cardiovascular markers</div><div class="toggle-sublabel">Monthly log for cholesterol, blood pressure, and related markers</div></div>
+          <label class="toggle"><input type="checkbox" id="s-feat-cardio" ${s.featCardioMarkers ? 'checked' : ''}><div class="toggle-track"></div></label>
         </div>
       </div>
     </div>
@@ -3524,6 +3930,7 @@ function renderSettings() {
     ['s-goal-low',      'goalWeightLow',          'number'],
     ['s-goal-high',     'goalWeightHigh',         'number'],
     ['s-start-date',    'appStartDate',           'text'],
+    ['s-age',           'age',                    'number'],
     ['s-wake',          'usualWakeTime',          'text'],
     ['s-bedtime',       'bedtimeTarget',          'text'],
     ['s-eat-cutoff',    'eatCutoff',              'text'],
@@ -3549,6 +3956,7 @@ function renderSettings() {
     ['s-feat-mood',           'featMoodLog'],
     ['s-feat-photos',         'featProgressPhotos'],
     ['s-feat-measurements',   'featMeasurements'],
+    ['s-feat-cardio',         'featCardioMarkers'],
   ];
   featToggles.forEach(([elId, key]) => {
     screen.querySelector('#' + elId)?.addEventListener('change', async e => {
@@ -3610,6 +4018,30 @@ function renderSettings() {
   screen.querySelector('#s-manual-points')?.addEventListener('click', openManualPointsModal);
   screen.querySelector('#s-habits')?.addEventListener('click', openHabitsCustomizer);
   screen.querySelector('#s-activities')?.addEventListener('click', openActivitiesCustomizer);
+  screen.querySelector('#s-primary-goal')?.addEventListener('change', e => {
+    const s = Store.getSettings(); s.primaryGoal = e.target.value; Store.saveSettings(s); showToast('Saved');
+  });
+
+  screen.querySelector('#s-protein-target')?.addEventListener('click', () => openProteinTargetModal(renderSettings));
+  screen.querySelector('#s-edit-training-plan')?.addEventListener('click', openTrainingPlanEditor);
+
+  // Session target stepper
+  screen.querySelector('#s-sessions-minus')?.addEventListener('click', () => {
+    const s2 = Store.getSettings();
+    const cur = s2.weeklySessionTarget || 3;
+    if (cur <= 2) return;
+    s2.weeklySessionTarget = cur - 1;
+    Store.saveSettings(s2);
+    screen.querySelector('#s-sessions-val').textContent = s2.weeklySessionTarget;
+  });
+  screen.querySelector('#s-sessions-plus')?.addEventListener('click', () => {
+    const s2 = Store.getSettings();
+    const cur = s2.weeklySessionTarget || 3;
+    if (cur >= 5) return;
+    s2.weeklySessionTarget = cur + 1;
+    Store.saveSettings(s2);
+    screen.querySelector('#s-sessions-val').textContent = s2.weeklySessionTarget;
+  });
 
   screen.querySelector('#s-sheets-connect')?.addEventListener('click', async () => {
     await SheetsSync.connect().catch(() => showToast('Connection failed. Please try again.'));
@@ -4271,7 +4703,7 @@ function renderHabitsCustomizerBody(body) {
 
       if (isCore && isDisabling) {
         toggle.checked = true; // revert visually while confirming
-        const pushback = CORE_HABIT_PUSHBACK[h.id] || 'This is a core habit for weight loss. Are you sure?';
+        const pushback = CORE_HABIT_PUSHBACK[h.id] || 'This is a core habit for body recomposition. Are you sure?';
         openModal(b => {
           b.innerHTML = `
             <div class="modal-title" style="margin-bottom:12px">Remove core habit?</div>
@@ -4424,6 +4856,144 @@ function renderHabitsCustomizerBody(body) {
         });
       });
     });
+  });
+}
+
+/* ── Protein Target Modal ── */
+
+function openProteinTargetModal(onSave) {
+  openModal(body => {
+    const s = Store.getSettings();
+    const cur = s.proteinCalcMethod || 'current';
+
+    const renderBody = (method) => {
+      const weightVal = method === 'target' ? '' : (s.startingWeight || '');
+      const curG = s.proteinTargetG;
+      body.innerHTML = `
+        <div class="modal-title">Daily protein target</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          ${[['current','Calculate from current weight'],['target','Calculate from target weight'],['manual','Set manually']].map(([val, lbl]) => `
+            <button class="protein-method-btn ${method === val ? 'selected' : ''}" data-method="${val}"
+              style="padding:11px 14px;background:var(--surface-2);border:1.5px solid ${method === val ? 'var(--sage)' : 'var(--border)'};border-radius:10px;font-size:14px;font-weight:500;color:${method === val ? 'var(--sage-dark)' : 'var(--text)'};text-align:left;cursor:pointer">${lbl}</button>
+          `).join('')}
+        </div>
+        <div id="pm-weight-group" style="display:${method !== 'manual' ? 'block' : 'none'}">
+          <input class="form-input" id="pm-weight" type="number" placeholder="Weight (lbs)" step="1" min="50" value="${method !== 'manual' ? (s.startingWeight || '') : ''}">
+          <p id="pm-preview" class="text-small" style="margin-top:8px;color:var(--sage-dark);display:${curG ? 'block' : 'none'}">${curG ? 'Current target: ' + curG + 'g' : ''}</p>
+        </div>
+        <div id="pm-manual-group" style="display:${method === 'manual' ? 'block' : 'none'}">
+          <label class="form-label">Daily protein target (g)</label>
+          <input class="form-input" id="pm-manual" type="number" placeholder="e.g. 160" step="5" min="50" value="${curG || ''}">
+        </div>
+        <button class="btn btn-primary btn-full mt-16" id="pm-save">Save</button>
+      `;
+
+      body.querySelectorAll('.protein-method-btn').forEach(btn => {
+        btn.addEventListener('click', () => renderBody(btn.dataset.method));
+      });
+
+      body.querySelector('#pm-weight')?.addEventListener('input', e => {
+        const w = parseFloat(e.target.value);
+        const prev = body.querySelector('#pm-preview');
+        if (!prev) return;
+        if (!isNaN(w) && w > 0) {
+          prev.textContent = `Calculated target: ${calculateProteinTarget(w)}g`;
+          prev.style.display = 'block';
+        } else {
+          prev.style.display = 'none';
+        }
+      });
+
+      body.querySelector('#pm-save').addEventListener('click', () => {
+        const s2 = Store.getSettings();
+        s2.proteinCalcMethod = method;
+        if (method === 'current' || method === 'target') {
+          const w = parseFloat(body.querySelector('#pm-weight')?.value);
+          if (!isNaN(w) && w > 0) {
+            s2.proteinTargetG = calculateProteinTarget(w);
+            if (method === 'current') s2.startingWeight = w;
+            if (method === 'target') { s2.goalWeightLow = w - 5; s2.goalWeightHigh = w + 5; }
+          }
+        } else {
+          const g = parseFloat(body.querySelector('#pm-manual')?.value);
+          if (!isNaN(g) && g > 0) s2.proteinTargetG = Math.round(g / 5) * 5;
+        }
+        Store.saveSettings(s2);
+        closeModal();
+        showToast('Protein target updated');
+        if (typeof onSave === 'function') onSave();
+        if (currentScreen === 'today') renderToday();
+      });
+    };
+
+    renderBody(cur);
+  });
+}
+
+/* ── Training Plan Editor ── */
+
+function openTrainingPlanEditor() {
+  openModal(renderTrainingPlanEditorBody);
+}
+
+function renderTrainingPlanEditorBody(body) {
+  const s         = Store.getSettings();
+  const splitDays = getSplitDays(s);
+
+  body.innerHTML = `
+    <div class="modal-title">Training Split</div>
+    <p class="text-muted text-small mb-16">These are the day types shown when you check off your training habit.</p>
+    <div id="split-day-list">
+      ${splitDays.map((d, i) => `
+        <div class="split-day-row" data-idx="${i}" data-id="${escHtml(d.id)}">
+          <input class="form-input split-day-input" type="text" value="${escHtml(d.name)}" maxlength="20" style="flex:1">
+          <button class="btn btn-sm btn-outline split-day-delete" data-idx="${i}" style="flex-shrink:0;margin-left:8px">Remove</button>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-outline btn-full mt-12" id="split-add-day">+ Add day type</button>
+    <button class="btn btn-primary btn-full mt-8" id="split-save">Save</button>
+  `;
+
+  body.querySelector('#split-add-day').addEventListener('click', () => {
+    const list = body.querySelector('#split-day-list');
+    const idx  = list.querySelectorAll('.split-day-row').length;
+    const row  = document.createElement('div');
+    row.className = 'split-day-row';
+    row.dataset.idx = idx;
+    row.dataset.id  = 'custom_' + idx;
+    row.innerHTML = `
+      <input class="form-input split-day-input" type="text" placeholder="e.g. Push" maxlength="20" style="flex:1">
+      <button class="btn btn-sm btn-outline split-day-delete" data-idx="${idx}" style="flex-shrink:0;margin-left:8px">Remove</button>
+    `;
+    list.appendChild(row);
+    row.querySelector('input').focus();
+    // bind delete on new row
+    row.querySelector('.split-day-delete').addEventListener('click', () => row.remove());
+  });
+
+  // Bind delete on existing rows
+  body.querySelectorAll('.split-day-delete').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.split-day-row').remove());
+  });
+
+  body.querySelector('#split-save').addEventListener('click', () => {
+    const rows = body.querySelectorAll('.split-day-row');
+    const newDays = [];
+    rows.forEach((row, i) => {
+      const name = row.querySelector('.split-day-input').value.trim();
+      if (!name) return;
+      const id = row.dataset.id || ('custom_' + i);
+      newDays.push({ id, name });
+    });
+    if (!newDays.length) { showToast('Add at least one day type'); return; }
+    const s2 = Store.getSettings();
+    s2.trainingSplit   = 'custom';
+    s2.customSplitDays = newDays;
+    Store.saveSettings(s2);
+    closeModal();
+    showToast('Training split saved');
+    if (currentScreen === 'week') renderWeek();
   });
 }
 
@@ -4702,7 +5272,7 @@ function openOnboarding() {
 }
 
 const OB_SCREENS = [
-  // Screen 1 — Welcome
+  // Screen 0 — Welcome
   () => `
     <div class="ob-screen">
       <img src="apple-touch-icon.png" alt="Root" class="ob-logo">
@@ -4711,7 +5281,7 @@ const OB_SCREENS = [
       <button class="ob-btn" id="ob-next">Next</button>
     </div>
   `,
-  // Screen 2 — How it works
+  // Screen 1 — How it works
   () => `
     <div class="ob-screen">
       <h1 class="ob-headline">Habits, not numbers.</h1>
@@ -4726,19 +5296,117 @@ const OB_SCREENS = [
       <button class="ob-btn" id="ob-next">Next</button>
     </div>
   `,
-  // Screen 3 — Reward goal
+  // Screen 2 — Training setup
+  () => {
+    const s = Store.getSettings();
+    const target = s.weeklySessionTarget || 3;
+    const split  = s.trainingSplit || 'upper_lower';
+    const custom = s.customSplitDays || [];
+    return `<div class="ob-screen">
+      <h1 class="ob-headline">Your training plan</h1>
+      <p class="ob-body">Setting up your split helps Root track your weekly training properly.</p>
+
+      <div class="form-group" style="width:100%;text-align:left">
+        <label class="form-label">How many strength sessions per week are you aiming for?</label>
+        <div class="stepper-row" style="display:flex;align-items:center;gap:12px;margin-top:8px">
+          <button class="stepper-btn" id="ob-sessions-minus">−</button>
+          <span id="ob-sessions-val" style="font-size:20px;font-weight:600;min-width:24px;text-align:center">${target}</span>
+          <button class="stepper-btn" id="ob-sessions-plus">+</button>
+        </div>
+      </div>
+
+      <div class="form-group" style="width:100%;text-align:left;margin-top:20px">
+        <label class="form-label">What does your training look like?</label>
+        <div class="ob-split-grid" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          ${[
+            ['full_body',   'Full body'],
+            ['upper_lower', 'Upper / Lower'],
+            ['ppl',         'Push / Pull / Legs'],
+            ['ppl_ul',      'Push / Pull / Legs / Upper / Lower'],
+            ['custom',      'Custom'],
+          ].map(([val, lbl]) => `
+            <button class="ob-split-btn ${split === val ? 'selected' : ''}" data-split="${val}"
+              style="padding:12px 16px;background:var(--surface-2);border:1.5px solid ${split === val ? 'var(--sage)' : 'var(--border)'};border-radius:10px;font-size:14px;font-weight:500;color:${split === val ? 'var(--sage-dark)' : 'var(--text)'};text-align:left;cursor:pointer">
+              ${lbl}
+            </button>
+          `).join('')}
+        </div>
+        <div id="ob-custom-days" style="display:${split === 'custom' ? 'block' : 'none'};margin-top:12px">
+          <label class="form-label" style="margin-bottom:8px;display:block">Name your training days</label>
+          <div id="ob-custom-day-list">
+            ${custom.length ? custom.map((d, i) => `
+              <div class="ob-custom-day-row" style="display:flex;gap:8px;margin-bottom:8px">
+                <input class="form-input ob-custom-day-input" type="text" value="${escHtml(d.name)}" maxlength="20" placeholder="Day name" style="flex:1">
+                <button class="btn btn-sm btn-outline ob-custom-day-remove" style="flex-shrink:0">✕</button>
+              </div>
+            `).join('') : `
+              <div class="ob-custom-day-row" style="display:flex;gap:8px;margin-bottom:8px">
+                <input class="form-input ob-custom-day-input" type="text" maxlength="20" placeholder="Day name" style="flex:1">
+                <button class="btn btn-sm btn-outline ob-custom-day-remove" style="flex-shrink:0">✕</button>
+              </div>
+            `}
+          </div>
+          <button class="btn btn-outline btn-full" id="ob-add-day" style="margin-top:4px">+ Add day</button>
+        </div>
+      </div>
+
+      <p class="ob-note" style="margin-top:16px">For recovery, aim to leave 48 hours before training the same muscle group again. Rest days are part of the plan.</p>
+      <button class="ob-btn" id="ob-next">Next</button>
+      <button class="ob-skip-step" id="ob-skip-training">I'll set this later</button>
+    </div>`;
+  },
+  // Screen 3 — Protein target
+  () => {
+    const s = Store.getSettings();
+    return `<div class="ob-screen">
+      <h1 class="ob-headline">Your protein target</h1>
+      <p class="ob-body">Protein is one of the highest-leverage nutrition habits for body recomposition, especially when paired with resistance training. Research supports roughly 0.7 to 1g per pound of bodyweight for people combining strength training with fat loss.</p>
+
+      <div class="form-group" style="width:100%;text-align:left">
+        <div class="ob-split-grid" style="display:flex;flex-direction:column;gap:8px">
+          ${[
+            ['current', 'Calculate from current weight'],
+            ['target',  'Calculate from target weight'],
+            ['manual',  'Set manually'],
+          ].map(([val, lbl]) => `
+            <button class="ob-protein-method-btn ${(s.proteinCalcMethod || 'current') === val ? 'selected' : ''}" data-method="${val}"
+              style="padding:12px 16px;background:var(--surface-2);border:1.5px solid ${(s.proteinCalcMethod || 'current') === val ? 'var(--sage)' : 'var(--border)'};border-radius:10px;font-size:14px;font-weight:500;color:${(s.proteinCalcMethod || 'current') === val ? 'var(--sage-dark)' : 'var(--text)'};text-align:left;cursor:pointer">
+              ${lbl}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div id="ob-protein-weight-group" class="form-group" style="width:100%;text-align:left;margin-top:12px">
+        <input class="form-input" id="ob-protein-weight" type="number" placeholder="Weight (lbs)" step="1" min="50" value="${s.startingWeight || ''}">
+        <p id="ob-protein-preview" class="ob-note" style="margin-top:8px;color:var(--sage-dark);display:${s.proteinTargetG ? 'block' : 'none'}">
+          Your daily protein target: ${s.proteinTargetG ? s.proteinTargetG + 'g' : ''} -- this is a starting point you can adjust in Settings.
+        </p>
+      </div>
+
+      <div id="ob-protein-manual-group" class="form-group" style="width:100%;text-align:left;margin-top:12px;display:none">
+        <label class="form-label">Daily protein target (g)</label>
+        <input class="form-input" id="ob-protein-manual" type="number" placeholder="e.g. 160" step="5" min="50" value="${s.proteinTargetG || ''}">
+      </div>
+
+      <p class="ob-note">You can adjust this anytime in Settings.</p>
+      <button class="ob-btn" id="ob-next">Next</button>
+      <button class="ob-skip-step" id="ob-skip-protein">I'll set this later</button>
+    </div>`;
+  },
+  // Screen 4 — Reward goal
   () => {
     const g = Store.getGoals();
     return `<div class="ob-screen">
       <h1 class="ob-headline">What are you working toward?</h1>
       <p class="ob-body">Every habit you check off earns points toward a personal reward. Set a goal now or come back to it later.</p>
       <div class="ob-chips">
-        <button class="ob-chip" data-label="Something to wear">👗 Something to wear</button>
-        <button class="ob-chip" data-label="An experience">✨ An experience</button>
-        <button class="ob-chip" data-label="Something for the home">🏠 Something for the home</button>
-        <button class="ob-chip" data-label="A treat">🌿 A treat</button>
-        <button class="ob-chip" data-label="A savings goal">💰 A savings goal</button>
-        <button class="ob-chip" data-label="">＋ Something else</button>
+        <button class="ob-chip" data-label="Something to wear">Something to wear</button>
+        <button class="ob-chip" data-label="An experience">An experience</button>
+        <button class="ob-chip" data-label="Something for the home">Something for the home</button>
+        <button class="ob-chip" data-label="A treat">A treat</button>
+        <button class="ob-chip" data-label="A savings goal">A savings goal</button>
+        <button class="ob-chip" data-label="">Something else</button>
       </div>
       <div class="form-group">
         <input class="form-input" id="ob-goal-name" type="text" placeholder="Name your goal" maxlength="60" autocomplete="off" value="${escHtml(g.name || '')}">
@@ -4751,7 +5419,7 @@ const OB_SCREENS = [
       <button class="ob-skip-step" id="ob-skip-goal">I'll set this later</button>
     </div>`;
   },
-  // Screen 4 — Quick setup
+  // Screen 5 — Quick setup
   () => {
     const s = Store.getSettings();
     return `<div class="ob-screen">
@@ -4772,16 +5440,38 @@ const OB_SCREENS = [
           <input class="form-input" id="ob-goal-high" type="number" placeholder="To"   step="0.5" style="flex:1" value="${s.goalWeightHigh || ''}">
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Primary goal</label>
+        <div class="ob-split-grid" style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          ${[
+            ['recomposition', 'Recomposition (lose fat and build muscle)'],
+            ['build_muscle',  'Primarily build muscle'],
+            ['lose_fat',      'Primarily lose fat'],
+          ].map(([val, lbl]) => `
+            <button class="ob-goal-btn ${(s.primaryGoal || 'recomposition') === val ? 'selected' : ''}" data-goal="${val}"
+              style="padding:10px 14px;background:var(--surface-2);border:1.5px solid ${(s.primaryGoal || 'recomposition') === val ? 'var(--sage)' : 'var(--border)'};border-radius:10px;font-size:13px;font-weight:500;color:${(s.primaryGoal || 'recomposition') === val ? 'var(--sage-dark)' : 'var(--text)'};text-align:left;cursor:pointer">
+              ${lbl}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <input class="form-input" id="ob-age" type="number" placeholder="Age (optional)" min="18" max="99" value="${s.age || ''}">
+        <p class="ob-note" style="margin-top:6px">Used to contextualize some cardiovascular habits.</p>
+      </div>
       <button class="ob-btn" id="ob-next">Next</button>
     </div>`;
   },
-  // Screen 5 — Done
+  // Screen 6 — Done
   () => {
+    const s = Store.getSettings();
+    const showCholNote = s.age && s.age >= 35;
     return `
       <div class="ob-screen">
         <img src="apple-touch-icon.png" alt="Root" class="ob-logo">
         <h1 class="ob-headline">You're all set.</h1>
         <p class="ob-body">Check in daily, reflect weekly, and let the consistency do the work. Progress in body recomposition is slow and non-linear -- the domains are there to show you the full picture, not just the scale.</p>
+        ${showCholNote ? `<p class="ob-body" style="font-size:13px;color:var(--text-muted)">Root is for habit tracking and support. For cholesterol, blood pressure, or medication decisions, talk with your doctor. Habits work alongside medical care, not instead of it.</p>` : ''}
         <button class="ob-btn" id="ob-next">Get started</button>
       </div>
     `;
@@ -4808,15 +5498,126 @@ function renderObScreen(n) {
   // Next button
   document.getElementById('ob-next')?.addEventListener('click', () => obAdvance(n));
 
-  // Screen 3 chips
-  document.querySelectorAll('.ob-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.getElementById('ob-goal-name').value = chip.dataset.label;
-      document.querySelectorAll('.ob-chip').forEach(c => c.classList.remove('selected'));
-      chip.classList.add('selected');
+  // Screen 2 — Training setup interactions
+  if (n === 2) {
+    // Session target stepper
+    let sessTarget = parseInt(document.getElementById('ob-sessions-val')?.textContent) || 3;
+    document.getElementById('ob-sessions-minus')?.addEventListener('click', () => {
+      if (sessTarget <= 2) return;
+      sessTarget--;
+      document.getElementById('ob-sessions-val').textContent = sessTarget;
     });
-  });
-  document.getElementById('ob-skip-goal')?.addEventListener('click', () => renderObScreen(n + 1));
+    document.getElementById('ob-sessions-plus')?.addEventListener('click', () => {
+      if (sessTarget >= 5) return;
+      sessTarget++;
+      document.getElementById('ob-sessions-val').textContent = sessTarget;
+    });
+
+    // Split selection
+    document.querySelectorAll('.ob-split-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ob-split-btn').forEach(b => {
+          b.classList.remove('selected');
+          b.style.borderColor = 'var(--border)';
+          b.style.color = 'var(--text)';
+        });
+        btn.classList.add('selected');
+        btn.style.borderColor = 'var(--sage)';
+        btn.style.color = 'var(--sage-dark)';
+        const customSection = document.getElementById('ob-custom-days');
+        if (customSection) customSection.style.display = btn.dataset.split === 'custom' ? 'block' : 'none';
+      });
+    });
+
+    // Custom days: remove
+    document.getElementById('ob-custom-day-list')?.addEventListener('click', e => {
+      if (e.target.classList.contains('ob-custom-day-remove')) {
+        e.target.closest('.ob-custom-day-row')?.remove();
+      }
+    });
+
+    // Custom days: add
+    document.getElementById('ob-add-day')?.addEventListener('click', () => {
+      const list = document.getElementById('ob-custom-day-list');
+      if (!list) return;
+      if (list.querySelectorAll('.ob-custom-day-row').length >= 7) return;
+      const row = document.createElement('div');
+      row.className = 'ob-custom-day-row';
+      row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
+      row.innerHTML = `<input class="form-input ob-custom-day-input" type="text" maxlength="20" placeholder="Day name" style="flex:1"><button class="btn btn-sm btn-outline ob-custom-day-remove" style="flex-shrink:0">✕</button>`;
+      list.appendChild(row);
+      row.querySelector('input').focus();
+    });
+
+    document.getElementById('ob-skip-training')?.addEventListener('click', () => renderObScreen(n + 1));
+  }
+
+  // Screen 3 — Protein target interactions
+  if (n === 3) {
+    const updateProteinUI = (method) => {
+      const wg = document.getElementById('ob-protein-weight-group');
+      const mg = document.getElementById('ob-protein-manual-group');
+      if (wg) wg.style.display = (method === 'current' || method === 'target') ? 'block' : 'none';
+      if (mg) mg.style.display = method === 'manual' ? 'block' : 'none';
+      document.querySelectorAll('.ob-protein-method-btn').forEach(b => {
+        const active = b.dataset.method === method;
+        b.classList.toggle('selected', active);
+        b.style.borderColor = active ? 'var(--sage)' : 'var(--border)';
+        b.style.color = active ? 'var(--sage-dark)' : 'var(--text)';
+      });
+    };
+
+    document.querySelectorAll('.ob-protein-method-btn').forEach(btn => {
+      btn.addEventListener('click', () => updateProteinUI(btn.dataset.method));
+    });
+
+    document.getElementById('ob-protein-weight')?.addEventListener('input', e => {
+      const w = parseFloat(e.target.value);
+      const preview = document.getElementById('ob-protein-preview');
+      if (!preview) return;
+      if (!isNaN(w) && w > 0) {
+        const g = calculateProteinTarget(w);
+        preview.textContent = `Your daily protein target: ${g}g -- this is a starting point you can adjust in Settings.`;
+        preview.style.display = 'block';
+      } else {
+        preview.style.display = 'none';
+      }
+    });
+
+    // Init UI to current method
+    const s = Store.getSettings();
+    updateProteinUI(s.proteinCalcMethod || 'current');
+    document.getElementById('ob-skip-protein')?.addEventListener('click', () => renderObScreen(n + 1));
+  }
+
+  // Screen 4 — Reward goal chips
+  if (n === 4) {
+    document.querySelectorAll('.ob-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const nameInput = document.getElementById('ob-goal-name');
+        if (nameInput) nameInput.value = chip.dataset.label;
+        document.querySelectorAll('.ob-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      });
+    });
+    document.getElementById('ob-skip-goal')?.addEventListener('click', () => renderObScreen(n + 1));
+  }
+
+  // Screen 5 — Quick setup: primary goal buttons
+  if (n === 5) {
+    document.querySelectorAll('.ob-goal-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ob-goal-btn').forEach(b => {
+          b.classList.remove('selected');
+          b.style.borderColor = 'var(--border)';
+          b.style.color = 'var(--text)';
+        });
+        btn.classList.add('selected');
+        btn.style.borderColor = 'var(--sage)';
+        btn.style.color = 'var(--sage-dark)';
+      });
+    });
+  }
 
   // Swipe left/right to navigate
   let touchStartX = 0, touchStartY = 0;
@@ -4838,29 +5639,74 @@ function renderObScreen(n) {
 }
 
 function obSaveScreen(n) {
+  // Screen 2 — Training setup
   if (n === 2) {
+    const s = Store.getSettings();
+    const sessVal = document.getElementById('ob-sessions-val');
+    if (sessVal) s.weeklySessionTarget = parseInt(sessVal.textContent) || 3;
+    const activeBtn = document.querySelector('.ob-split-btn.selected');
+    if (activeBtn) {
+      s.trainingSplit = activeBtn.dataset.split;
+      if (s.trainingSplit === 'custom') {
+        const inputs = document.querySelectorAll('.ob-custom-day-input');
+        s.customSplitDays = Array.from(inputs)
+          .map((inp, i) => ({ id: 'custom_' + i, name: inp.value.trim() }))
+          .filter(d => d.name);
+      }
+    }
+    Store.saveSettings(s);
+  }
+
+  // Screen 3 — Protein target
+  if (n === 3) {
+    const s = Store.getSettings();
+    const activeMethod = document.querySelector('.ob-protein-method-btn.selected');
+    const method = activeMethod?.dataset.method || s.proteinCalcMethod || 'current';
+    s.proteinCalcMethod = method;
+    if (method === 'current' || method === 'target') {
+      const w = parseFloat(document.getElementById('ob-protein-weight')?.value);
+      if (!isNaN(w) && w > 0) {
+        s.proteinTargetG = calculateProteinTarget(w);
+        if (method === 'current') s.startingWeight = w;
+        if (method === 'target') { s.goalWeightLow = w - 5; s.goalWeightHigh = w + 5; }
+      }
+    } else if (method === 'manual') {
+      const g = parseFloat(document.getElementById('ob-protein-manual')?.value);
+      if (!isNaN(g) && g > 0) s.proteinTargetG = Math.round(g / 5) * 5;
+    }
+    Store.saveSettings(s);
+  }
+
+  // Screen 4 — Reward goal
+  if (n === 4) {
     const name   = document.getElementById('ob-goal-name')?.value.trim();
     const amount = parseFloat(document.getElementById('ob-goal-amount')?.value);
     if (name) {
       const goals = Store.getGoals();
       goals.name         = name;
       goals.amount       = isNaN(amount) ? 0 : amount;
-      goals.pointsTarget = goals.pointsTarget || 120; // default: "Something I really want"
+      goals.pointsTarget = goals.pointsTarget || 120;
       goals.level        = goals.level        || 'medium';
       goals.dateSet      = goals.dateSet      || todayStr();
       Store.saveGoals(goals);
     }
   }
-  if (n === 3) {
+
+  // Screen 5 — Quick setup
+  if (n === 5) {
     const s  = Store.getSettings();
     const name = document.getElementById('ob-name')?.value.trim();
     const sw   = parseFloat(document.getElementById('ob-start-weight')?.value);
     const gl   = parseFloat(document.getElementById('ob-goal-low')?.value);
     const gh   = parseFloat(document.getElementById('ob-goal-high')?.value);
-    if (name)    s.name           = name;
-    if (!isNaN(sw)) s.startingWeight = sw;
-    if (!isNaN(gl)) s.goalWeightLow  = gl;
-    if (!isNaN(gh)) s.goalWeightHigh = gh;
+    const age  = parseInt(document.getElementById('ob-age')?.value);
+    const goalBtn = document.querySelector('.ob-goal-btn.selected');
+    if (name)         s.name           = name;
+    if (!isNaN(sw))   s.startingWeight = sw;
+    if (!isNaN(gl))   s.goalWeightLow  = gl;
+    if (!isNaN(gh))   s.goalWeightHigh = gh;
+    if (!isNaN(age) && age > 0) s.age  = age;
+    s.primaryGoal = goalBtn?.dataset.goal || s.primaryGoal || 'recomposition';
     Store.saveSettings(s);
   }
 }
@@ -5021,6 +5867,7 @@ const SheetsSync = {
       await this._syncGoalsTab(id);
       await this._syncSettingsTab(id);
       await this._syncBadgesTab(id);
+      await this._syncCardioTab(id);
       this.setLastSynced(new Date().toISOString());
       this.setQueue([]);
       localStorage.removeItem('root_google_reauth_needed');
@@ -5092,6 +5939,7 @@ const SheetsSync = {
           { properties: { title: 'Goals'        } },
           { properties: { title: 'Settings'     } },
           { properties: { title: 'Badges'       } },
+          { properties: { title: 'Cardiovascular Markers' } },
         ]
       }
     });
@@ -5183,6 +6031,15 @@ const SheetsSync = {
       rows.push([badgeId, def ? def.label : badgeId, dateEarned || '']);
     });
     await this._writeTab(id, 'Badges', rows);
+  },
+
+  async _syncCardioTab(id) {
+    const logs = Store.getCardioLogs();
+    const rows = [['Date', 'LDL (mg/dL)', 'HDL (mg/dL)', 'Triglycerides (mg/dL)', 'Total Cholesterol (mg/dL)', 'BP Systolic (mmHg)', 'BP Diastolic (mmHg)', 'Resting HR (bpm)', 'Waist (in)']];
+    logs.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(l => {
+      rows.push([l.date, l.ldl ?? '', l.hdl ?? '', l.triglycerides ?? '', l.totalCholesterol ?? '', l.bpSystolic ?? '', l.bpDiastolic ?? '', l.restingHR ?? '', l.waist ?? '']);
+    });
+    await this._writeTab(id, 'Cardiovascular Markers', rows);
   },
 
   // ── Restore ───────────────────────────────────────────────────────────────
