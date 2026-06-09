@@ -38,52 +38,46 @@ const DEFAULT_HABITS = [
   { id: 'sleep_bed',       label: 'In bed by 10:30pm',                           pillar: 'sleep',     weight: 3, points: 2, retroactive: true,  opensWorkout: false, priority: false },
   { id: 'sleep_wake',      label: 'Woke up within 30 min of usual wake time',    pillar: 'sleep',     weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
   { id: 'sleep_caffeine',  label: 'No caffeine after 1pm',                       pillar: 'sleep',     weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'sleep_morning',   label: 'Got outside in the morning',                  pillar: 'sleep',     weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'sleep_morning',   label: 'Got outside within an hour of waking',        pillar: 'sleep',     weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   // Nutrition — core first
-  { id: 'nutr_protein',    label: 'Hit protein target today',                    pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_heart',      label: 'Heart-healthy plate today',                   pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_fiber',      label: 'Soluble fiber today',                         pillar: 'nutrition', weight: 2, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_lunch',      label: 'Protein and plants at lunch',                 pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_dinner',     label: 'Protein and plants at dinner',                pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_protein',    label: 'High-protein day today',                      pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_heart',      label: 'Limited saturated fat and processed meat today', pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_fiber',      label: 'Fiber-rich food today (oats, beans, lentils, or fruit)', pillar: 'nutrition', weight: 2, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_breakfast',  label: 'Protein at breakfast',                        pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_all_meals',  label: 'Protein at every meal today',                 pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'nutr_omega3',     label: 'Omega-3 source today',                        pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'nutr_alcohol',    label: 'Alcohol-free today',                          pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'nutr_no_eat',     label: 'Planned evening eating',                      pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_no_junk',    label: 'No processed meat today',                     pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_nuts',       label: 'Nuts or legumes today',                       pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   // Training
   { id: 'train_plan',      label: 'Followed my training plan today',             pillar: 'training',  weight: 4, points: 3, retroactive: false, opensWorkout: false, priority: true  },
-  { id: 'train_movement',  label: 'Movement floor hit today',                    pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'train_movement',  label: 'Daily walk or movement today',                pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'train_cardio',    label: 'Cardio or conditioning session',              pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: true,  priority: false },
-  { id: 'train_mobility',  label: 'Mobility or stretching',                      pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'recovery', alsoWeight: 1 },
-  { id: 'train_easy',      label: 'Easy movement today',                         pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'train_mobility',  label: 'Mobility or stretching (15+ min)',            pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'recovery', alsoWeight: 1 },
+  { id: 'train_easy',      label: 'Active recovery today',                       pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   // Recovery
-  { id: 'rec_outside',     label: 'Got outside today (non-workout)',             pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'rec_stress',      label: 'Managed stress today',                        pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'rec_me',          label: 'Did one thing just for me',                   pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'rec_task',        label: 'Made progress on one non-work task',          pillar: 'recovery',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_stress',      label: 'Managed stress today (breathing, walk, or wind-down)', pillar: 'recovery', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_me',          label: 'Prioritized something just for me',           pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_task',        label: 'Made progress on a personal goal today',      pillar: 'recovery',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
 ];
 
 const HABIT_RATIONALE = {
   sleep_bed:      "Sleep supports training recovery, appetite regulation, and hormonal patterns relevant to muscle building. Experimental studies suggest sleep restriction reduces muscle protein synthesis and lowers testosterone, though the exact size of these effects varies between studies. Consistently getting 7 to 9 hours is the recommendation with the strongest evidence base for active men. Evidence quality: moderate to strong.",
   sleep_wake:     "Consistent wake time is one of the more reliable anchors for circadian rhythm stability. This stabilizes sleep architecture over time and supports consistent hormonal patterns. Evidence quality: moderate.",
   sleep_caffeine: "Caffeine has a half-life of roughly 5 to 6 hours. A 2013 controlled study found caffeine taken 6 hours before bed reduced total sleep by approximately one hour. Individual metabolism varies considerably. Evidence quality: moderate.",
-  sleep_morning:  "Morning light exposure helps regulate circadian timing, which supports sleep quality and consistent sleep patterns. Most supporting studies are small. The habit also adds low-intensity movement. Evidence quality: moderate.",
-  nutr_protein:   "Protein is the primary nutritional lever for body recomposition. Research supports roughly 0.7 to 1g per pound of bodyweight for people combining resistance training with fat loss goals. A randomized trial by Longland et al. (2016) found that higher protein intake during an energy deficit combined with exercise led to greater lean mass gain and more fat loss than lower protein intake. The ISSN position stand (2017) supports 1.4 to 2.0g per kg per day for exercising individuals. Evidence quality: strong.",
-  nutr_heart:     "Heart-healthy eating for high cholesterol primarily means limiting saturated fat, which raises LDL, avoiding processed meats, and increasing plant foods and fiber. The American Heart Association recommends limiting saturated fat to less than 6% of total calories for people following a heart-healthy pattern. Evidence for dietary saturated fat and LDL is strong and consistent across decades of research. Examples: olive oil instead of butter, lean or plant proteins, plenty of vegetables.",
-  nutr_fiber:     "Soluble fiber (found in oats, beans, lentils, psyllium, barley, apples, chia, flaxseed) reduces LDL cholesterol through bile acid binding in the gut. A 2023 meta-analysis of 181 RCTs found soluble fiber supplementation reduced LDL by an average of 8.28 mg/dL. Each additional 5g per day reduced LDL by approximately 5.57 mg/dL. Evidence quality: strong.",
-  nutr_lunch:     "Protein and vegetable-centred meals support satiety, provide fiber and micronutrients, and reduce reliance on refined carbohydrates. Evidence for meal composition effects on satiety is reasonably consistent.",
-  nutr_dinner:    "Same logic as lunch. Ending the day with protein and plants fits within a heart-healthy pattern and supports muscle protein synthesis overnight.",
+  sleep_morning:  "Morning light exposure helps regulate circadian rhythm, which supports sleep quality, consistent sleep onset, and hormonal patterns relevant to muscle building and appetite regulation. The effect is strongest in the first hour after waking. Even a brief walk outside counts. Evidence quality: moderate.",
+  nutr_protein:   "Protein is the primary nutritional lever for body recomposition. Research supports roughly 0.7 to 1g per pound of bodyweight for people combining resistance training with fat loss goals. A high-protein day means roughly a palm-sized serving of protein at each main meal. A randomized trial by Longland et al. (2016) found that higher protein intake during an energy deficit combined with exercise led to greater lean mass gain and more fat loss than lower protein intake. The ISSN position stand (2017) supports 1.4 to 2.0g per kg per day for exercising individuals. Evidence quality: strong.",
+  nutr_heart:     "Limiting saturated fat is one of the most evidence-supported dietary interventions for LDL cholesterol. The American Heart Association recommends keeping saturated fat below 6% of total daily calories. In practice this means choosing olive oil over butter, lean or plant proteins over fatty or processed meats, and building most meals around vegetables and whole foods. Processed meats specifically are classified as Group 1 carcinogens by WHO IARC and are high in sodium and saturated fat. Evidence quality: strong.",
+  nutr_fiber:     "Soluble fiber reduces LDL cholesterol through bile acid binding in the gut. Good sources are oats, beans, lentils, apples, pears, barley, chia seeds, and flaxseed. A 2023 meta-analysis of 181 RCTs found soluble fiber supplementation reduced LDL by an average of 8.28 mg/dL. Each additional 5g per day reduced LDL by approximately 5.57 mg/dL. A bowl of oatmeal, a serving of beans, or a piece of fruit with skin counts. Evidence quality: strong.",
+  nutr_breakfast: "Distributing protein intake across meals, rather than backloading it at dinner, supports muscle protein synthesis throughout the day. Research suggests spreading protein intake relatively evenly across 3 to 4 meals produces better lean mass outcomes than the same total protein consumed in fewer sittings. Starting the day with protein also supports satiety and reduces reliance on refined carbohydrates at breakfast. Evidence quality: moderate.",
+  nutr_all_meals: "Consistently hitting a meaningful protein target at every meal is more effective for muscle protein synthesis than hitting the daily total in one or two sittings. A practical target is 30 to 50g of protein per meal depending on body size. Evidence quality: moderate.",
   nutr_omega3:    "Omega-3 fatty acids (EPA and DHA) reliably reduce triglycerides, a cardiovascular risk factor alongside cholesterol. Evidence for triglyceride reduction is strong. Evidence for direct LDL reduction is weaker and inconsistent. Good food sources include salmon, sardines, mackerel, trout, chia seeds, flaxseed, and walnuts. Evidence quality: strong for triglycerides, moderate for other cardiovascular outcomes.",
   nutr_alcohol:   "Alcohol raises triglycerides, disrupts sleep architecture, and contributes calories without nutritional value relevant to body recomposition. Regular consumption is linked to increased cancer risk in observational research. Evidence quality: strong for sleep and triglycerides.",
   nutr_no_eat:    "The goal is not fasting for its own sake -- it is making evening food intake intentional rather than reactive. Randomized trials comparing time-restricted eating to standard calorie management show mixed results. The practical benefit is likely reducing unplanned snacking. Evidence quality: mixed for metabolic benefits, reasonable for reducing unplanned intake.",
-  nutr_no_junk:   "Processed meats are classified as Group 1 carcinogens by WHO IARC, meaning there is sufficient evidence of a link to colorectal cancer. This classification reflects strength of evidence, not that absolute risk is large. Regular daily consumption is what the evidence flags. Processed meats also tend to be high in sodium and saturated fat, relevant for cardiovascular health.",
-  nutr_nuts:      "Nuts and legumes are associated with lower cardiovascular risk in large observational studies. They provide fiber, plant protein, healthy fats, and minerals. A serving of nuts daily is part of several evidence-based heart-healthy dietary patterns including the Mediterranean diet. Evidence quality: moderate to strong from observational research.",
   train_plan:     "Resistance training is the foundation of body recomposition. It stimulates muscle protein synthesis, increases lean mass, raises resting metabolic rate, and improves insulin sensitivity. ACSM recommends training each muscle group 2 to 3 times per week for hypertrophy, with at least 48 hours between sessions for the same muscle groups. Progressive overload -- gradually increasing load or volume -- is necessary for continued adaptation. Rest days are part of the plan. Evidence quality: very strong.",
-  train_movement: "Low-intensity movement throughout the day (sometimes called NEAT -- non-exercise activity thermogenesis) contributes to total daily energy expenditure and cardiovascular health independently of structured exercise. A daily walk or movement snack adds activity without meaningfully impairing recovery from strength training. Evidence quality: moderate.",
+  train_movement: "Low-intensity movement throughout the day (sometimes called NEAT -- non-exercise activity thermogenesis) contributes to total daily energy expenditure and cardiovascular health independently of structured exercise. A daily walk or movement snack adds meaningful activity without impairing recovery from strength training. This habit is about not being sedentary on top of your training -- it doesn't require a formal workout. Evidence quality: moderate.",
   train_cardio:   "Cardiovascular exercise supports heart health, improves VO2 max, and helps manage triglycerides and blood pressure. It is complementary to strength training for body recomposition but secondary to it for muscle building specifically. Evidence quality: strong for cardiovascular health.",
-  train_mobility: "Regular mobility work supports joint health, movement quality, and injury prevention. Injury prevention protects training consistency, which is the variable that matters most over time. Evidence for specific hypertrophy benefits is limited. Evidence quality: moderate for injury prevention.",
-  train_easy:     "Light movement on rest days supports blood flow, reduces muscle soreness, and keeps daily activity levels consistent. Evidence is modest -- the main benefit is staying active without accumulating training fatigue. Evidence quality: limited.",
-  rec_outside:    "Time in natural environments is associated with lower self-reported stress and improved mood in multiple observational studies. Effect sizes are modest. Evidence quality: moderate, primarily observational.",
+  train_mobility: "Regular mobility work supports joint health, movement quality, and injury prevention over time. Injury prevention is the primary value -- consistent training across months and years depends on staying healthy. Evidence for direct hypertrophy benefits from mobility work is limited. A 15-minute session is enough to maintain range of motion and reduce injury risk. Evidence quality: moderate for injury prevention.",
+  train_easy:     "Light movement on rest days supports blood flow, reduces muscle soreness, and contributes to daily energy expenditure without adding meaningful training fatigue. This could be a short walk, gentle cycling, swimming, or any low-intensity movement that feels restorative rather than taxing. Evidence quality: limited for specific recovery benefits; moderate for maintaining consistent activity levels.",
   rec_stress:     "Chronic psychological stress raises cortisol, which at sustained elevated levels can impair recovery and hormonal health. Stress management is a supporting factor for body recomposition rather than a primary driver. Evidence quality: moderate.",
   rec_me:         "Maintaining activities outside of work or obligations supports mental health and long-term habit sustainability. Evidence is primarily from wellbeing research.",
   rec_task:       "A sense of agency and progress outside primary obligations is associated with lower chronic stress in observational research.",
@@ -112,11 +106,11 @@ const CORE_HABIT_IDS = ['train_plan', 'nutr_protein', 'nutr_heart', 'nutr_fiber'
 
 const CORE_HABIT_PUSHBACK = {
   train_plan:   "Consistent resistance training is the foundation of body recomposition. Without it, fat loss tends to include muscle loss. Are you sure?",
-  nutr_protein: "Protein is one of the most consistently supported nutritional levers for recomposition -- particularly for preserving lean mass during fat loss. Are you sure?",
-  nutr_fiber:   "Soluble fiber has strong evidence for LDL reduction, one of the most effective dietary interventions for high cholesterol. Are you sure?",
-  nutr_heart:   "Heart-healthy eating patterns are the primary dietary lever for cardiovascular risk alongside medication. Are you sure?",
+  nutr_protein:   "Protein is the most consistently supported nutritional lever for body recomposition, particularly for preserving lean mass during fat loss. A high-protein day -- roughly a palm of protein at each meal -- is the single highest-leverage nutrition habit in this app. Are you sure?",
+  nutr_fiber:     "Soluble fiber has strong evidence for LDL reduction and is one of the most effective dietary interventions for high cholesterol. A bowl of oats, a serving of beans, or fruit with skin counts. Are you sure?",
+  nutr_heart:     "Limiting saturated fat and processed meat is the primary dietary lever for LDL cholesterol alongside medication. It is one of the most evidence-supported nutrition habits for cardiovascular health. Are you sure?",
   sleep_bed:      "Sleep restriction reduces muscle protein synthesis and impairs recovery. It is a meaningful lever for both body composition and cardiovascular health. Are you sure?",
-  train_movement: "Low-intensity daily movement contributes independently to cardiovascular health and total energy expenditure. It requires very little recovery cost. Are you sure?",
+  train_movement: "Daily low-intensity movement contributes independently to cardiovascular health and total energy expenditure without meaningful recovery cost. Even a 10-minute walk counts. Are you sure?",
 };
 
 const BADGE_DEFINITIONS = [
@@ -262,13 +256,24 @@ const Store = {
       // Root migrations from Bloom habit IDs
       { id: 'nutr_fiber',    oldLabels: ['Approx 25 to 30g fiber throughout day'], newLabel: 'Soluble fiber today' },
       { id: 'nutr_no_eat',   oldLabels: ['Evening eating cutoff'],                 newLabel: 'Planned evening eating' },
-      { id: 'nutr_no_junk',  oldLabels: ['No processed meat today'],               newLabel: 'No processed meat today' },
+      // Root v2 label updates
+      { id: 'nutr_protein',   oldLabels: ['Hit protein target today'],                           newLabel: 'High-protein day today' },
+      { id: 'nutr_heart',     oldLabels: ['Heart-healthy plate today'],                           newLabel: 'Limited saturated fat and processed meat today' },
+      { id: 'nutr_fiber',     oldLabels: ['Soluble fiber today', 'Approx 25 to 30g fiber throughout day'], newLabel: 'Fiber-rich food today (oats, beans, lentils, or fruit)' },
+      { id: 'train_movement', oldLabels: ['Movement floor hit today'],                            newLabel: 'Daily walk or movement today' },
+      { id: 'sleep_morning',  oldLabels: ['Got outside in the morning'],                          newLabel: 'Got outside within an hour of waking' },
+      { id: 'rec_stress',     oldLabels: ['Managed stress today'],                                newLabel: 'Managed stress today (breathing, walk, or wind-down)' },
+      { id: 'rec_me',         oldLabels: ['Did one thing just for me'],                           newLabel: 'Prioritized something just for me' },
+      { id: 'rec_task',       oldLabels: ['Made progress on one non-work task'],                  newLabel: 'Made progress on a personal goal today' },
+      { id: 'train_easy',     oldLabels: ['Easy movement today'],                                 newLabel: 'Active recovery today' },
+      { id: 'train_mobility', oldLabels: ['Mobility or stretching'],                              newLabel: 'Mobility or stretching (15+ min)' },
     ];
 
-    // Remove retired habits from Bloom
-    const RETIRED = ['sleep_outside', 'nutr_breakfast', 'nutr_water', 'nutr_vitamins', 'nutr_enough',
+    // Remove retired habits from Bloom and Root v1
+    const RETIRED = ['sleep_outside', 'nutr_water', 'nutr_vitamins', 'nutr_enough',
                      'move_strength', 'move_other', 'move_walk', 'move_mobility',
-                     'stress_outside', 'stress_me', 'stress_task'];
+                     'stress_outside', 'stress_me', 'stress_task',
+                     'nutr_no_junk', 'nutr_nuts', 'rec_outside', 'nutr_lunch', 'nutr_dinner'];
 
     // Collect custom habits to preserve at end of their pillar
     let migrated = stored
@@ -317,9 +322,7 @@ const Store = {
     const s = this.getSettings();
     migrated = migrated.map(h => {
       if (h.id === 'nutr_protein') {
-        const g = s.proteinTargetG;
-        const base = 'Hit protein target today';
-        return { ...h, label: g ? `${base} (${g}g)` : base };
+        return { ...h, label: 'High-protein day today' };
       }
       if (h.id === 'sleep_bed') {
         const t = s.bedtimeTarget || '22:30';
@@ -669,9 +672,8 @@ const Streak = {
 const TBUNDLE_PROMPTS = {
   train_plan:     "What makes your workouts feel good -- music, a show, silence, working out with someone?",
   train_cardio:   "What do you pair with this session to look forward to it?",
-  train_easy:     "What do you like during easy movement -- a podcast, music, a call, or just quiet?",
+  train_easy:     "What do you do for active recovery that actually feels good -- a walk, swimming, something else?",
   train_mobility: "What helps this feel like downtime -- a show, music, or just quiet time?",
-  rec_outside:    "What makes outside time feel like a genuine break for you?",
   nutr_omega3:    "What's your most automatic morning habit you could stack this onto?",
   nutr_vitamins:  "What's your most automatic morning habit you could stack this onto?",
   sleep_bed:      "What helps you wind down — a show, reading, music, something else?",
@@ -2823,7 +2825,7 @@ function getPillarFeedback(pillar, pct) {
     },
     nutrition: {
       high:   "Solid nutrition week. Protein and whole foods are showing up consistently.",
-      mid:    "Nutrition is at halfway. Hitting protein at the first two meals would move this.",
+      mid:    "Nutrition is at halfway. Protein at breakfast is the highest-leverage place to start.",
       low:    "Protein is the nutrition habit most directly linked to body recomposition outcomes. If one nutrition habit gets protected this week, make it the protein target.",
     },
     training: {
@@ -5239,7 +5241,7 @@ function openHowRootWorks() {
 
       <div class="how-section">
         <div class="how-heading">Your core habits and bonus habits</div>
-        <p>Six habits are marked as core commitments: followed training plan, hit protein target, heart-healthy plate, soluble fiber, in bed by target time, and movement floor. Completing at least five of those six is what counts as a streak day. Everything else on your list is a bonus habit. Bonus habits still earn points and contribute to your domain bars -- they just don't affect the streak.</p>
+        <p>Six habits are marked as core commitments: followed training plan, high-protein day, limited saturated fat and processed meat, fiber-rich food, in bed by target time, and daily walk or movement. Completing at least five of those six is what counts as a streak day. Everything else on your list is a bonus habit. Bonus habits still earn points and contribute to your domain bars -- they just don't affect the streak.</p>
       </div>
 
       <div class="how-section">
