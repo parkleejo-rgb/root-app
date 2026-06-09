@@ -2304,3 +2304,76 @@ textarea.form-input {
 .stepper-btn:active {
   background: var(--sage-light);
 }
+
+/* Training day grid */
+.training-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin: 10px 0 6px;
+}
+.training-day-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 1px;
+  border-radius: 8px;
+}
+.training-day-col.today {
+  background: rgba(45, 74, 62, 0.07);
+}
+.training-day-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.training-day-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+}
+.training-day-dot.filled {
+  background: var(--sage);
+  border-color: var(--sage);
+}
+.training-day-dot.rest {
+  background: transparent;
+  border-color: var(--text-muted);
+  border-style: dashed;
+}
+.training-day-dot.future {
+  opacity: 0.2;
+  border-color: var(--border);
+}
+.training-day-dot.empty {
+  opacity: 0.4;
+}
+.training-day-name {
+  font-size: 8px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 11px;
+  line-height: 1.2;
+}
+.training-day-col.today .training-day-name {
+  color: var(--text);
+  font-weight: 600;
+}
+.training-day-col.today .training-day-dot.filled {
+  box-shadow: 0 0 0 3px rgba(45, 74, 62, 0.15);
+}
+.today-training-strip {
+  margin: 6px 0 2px;
+  padding: 8px 12px 4px;
+  background: var(--card-bg);
+  border-radius: 12px;
+}
+.today-training-strip .training-day-grid {
+  margin: 0;
+}
