@@ -1,11 +1,11 @@
 {
-  "name": "Bloom — Postpartum Progress Tracker",
-  "short_name": "Bloom",
-  "description": "Personal postpartum wellness and weight loss tracker",
+  "name": "Root — Body Recomposition Tracker",
+  "short_name": "Root",
+  "description": "Personal body recomposition and heart health tracker",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#FAF8F4",
-  "theme_color": "#8FAF8A",
+  "background_color": "#F7F5F2",
+  "theme_color": "#2D4A3E",
   "orientation": "portrait-primary",
   "icons": [
     {

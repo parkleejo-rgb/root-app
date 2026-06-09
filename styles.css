@@ -1,25 +1,26 @@
 /* ─── Design Tokens ─────────────────────────────────────────────────────── */
 :root {
-  --bg:          #FAF8F4;
+  --bg:          #F7F5F2;
   --surface:     #FFFFFF;
-  --surface-2:   #F4F1EC;
-  --sage:        #8FAF8A;
-  --sage-light:  #C8DCC5;
-  --sage-dark:   #5D7A58;
-  --rose:        #C4938A;
-  --rose-light:  #DDB8B3;
-  --sand:        #C4B49A;
-  --sand-light:  #E8DFD0;
-  --text:        #3A3530;
-  --text-muted:  #8A8480;
-  --text-light:  #B0ABA5;
-  --border:      #E8E4DE;
-  --border-dark: #D4CFC8;
+  --surface-2:   #F0EDE8;
+  --sage:        #2D4A3E;
+  --sage-light:  #C8D8D2;
+  --sage-dark:   #1E3329;
+  --rose:        #4A5568;
+  --rose-light:  #CBD5E0;
+  --sand:        #6B7280;
+  --sand-light:  #E5E7EB;
+  --text:        #1A1A1A;
+  --text-muted:  #6B7280;
+  --text-light:  #9CA3AF;
+  --border:      #E5E7EB;
+  --border-dark: #D1D5DB;
+  --card-bg:     #FFFFFF;
   --radius:      12px;
   --radius-sm:   8px;
   --radius-lg:   20px;
-  --shadow:      0 2px 12px rgba(58,53,48,0.08);
-  --shadow-sm:   0 1px 4px rgba(58,53,48,0.06);
+  --shadow:      0 2px 12px rgba(26,26,26,0.08);
+  --shadow-sm:   0 1px 4px rgba(26,26,26,0.06);
   --nav-height:  64px;
   --header-height: 72px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -159,8 +160,8 @@
 }
 .ob-domain-sleep     { background: #D6E8F0; color: #3A6B7A; }
 .ob-domain-nutrition { background: var(--sage-light); color: var(--sage-dark); }
-.ob-domain-movement  { background: var(--rose-light); color: #8A4A44; }
-.ob-domain-stress    { background: var(--sand-light); color: #7A6A50; }
+.ob-domain-training  { background: var(--rose-light); color: #8A4A44; }
+.ob-domain-recovery  { background: var(--sand-light); color: #7A6A50; }
 
 .ob-chips {
   display: flex;
@@ -465,8 +466,8 @@ body {
 }
 .pillar-dot.sleep     { background: #A8C5D6; }
 .pillar-dot.nutrition { background: var(--sage); }
-.pillar-dot.movement  { background: var(--rose); }
-.pillar-dot.stress    { background: var(--sand); }
+.pillar-dot.training  { background: var(--rose); }
+.pillar-dot.recovery  { background: var(--sand); }
 
 /* ─── Habit Checkboxes ───────────────────────────────────────────────────── */
 .habit-group {

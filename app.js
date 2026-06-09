@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Bloom — Postpartum Progress Tracker
+   Root — Body Recomposition and Heart Health Tracker
    app.js — Single-file SPA logic
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -8,16 +8,16 @@
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 const MOTIVATIONAL_MESSAGES = [
+  "Consistency beats intensity over time.",
+  "Progress in body recomposition is slow. That doesn't mean it isn't happening.",
+  "Show up in the way your body can today.",
+  "Sleep supports the training you're trying to adapt to.",
   "Small consistent choices compound.",
-  "You're doing more than you think.",
-  "Rest is part of the work.",
-  "Postpartum progress is not linear. That's normal.",
-  "One good choice leads to the next.",
-  "You're building something that lasts.",
-  "Your body is doing a lot right now. Give it what it needs.",
-  "Progress lives in the quiet days too.",
-  "Consistency beats intensity every time.",
-  "You're further along than you were yesterday.",
+  "Protein first is a useful default.",
+  "Recovery is part of training, not separate from it.",
+  "The scale is one data point. Strength, energy, and how your clothes fit are others.",
+  "Progressive overload over months. That's the mechanism.",
+  "The habits that protect your heart also support your training.",
 ];
 
 const MAINTENANCE_MESSAGES = [
@@ -26,94 +26,96 @@ const MAINTENANCE_MESSAGES = [
   "Consistency looks different now -- less about the scale, more about feeling strong.",
   "You built this. Keeping it is the same work.",
   "Small consistent choices compound.",
-  "Rest is part of the work.",
-  "You're doing more than you think.",
-  "Your body is doing a lot right now. Give it what it needs.",
-  "Progress lives in the quiet days too.",
-  "You're building something that lasts.",
+  "Recovery is part of training, not separate from it.",
+  "Protein first is a useful default.",
+  "The habits that protect your heart also support your training.",
+  "Progressive overload over months. That's the mechanism.",
+  "Strength, energy, and how your clothes fit are better signals than the scale alone.",
 ];
 
 const DEFAULT_HABITS = [
-  // Sleep  (sleep_outside removed — morning walk now covers circadian benefit in Movement)
-  { id: 'sleep_bed',      label: 'In bed by 10:30pm',                          pillar: 'sleep',     weight: 3, points: 2, retroactive: true,  opensWorkout: false, priority: false },
-  { id: 'sleep_wake',     label: 'Woke up within 30 min of usual wake time',   pillar: 'sleep',     weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'sleep_caffeine', label: 'No caffeine after 1pm',                      pillar: 'sleep',     weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  // Nutrition — ordered by points desc
-  { id: 'nutr_breakfast', label: 'High protein breakfast (30g goal)',          pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_fiber',     label: 'Approx 25 to 30g fiber throughout day',         pillar: 'nutrition', weight: 2, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_no_eat',    label: 'Evening eating cutoff',                      pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_no_junk',   label: 'No processed meat today',                    pillar: 'nutrition', weight: 3, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_alcohol',   label: 'Alcohol-free today',                         pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_lunch',     label: 'Protein and plants at lunch',                pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_dinner',    label: 'Protein and plants at dinner',               pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_water',     label: 'Drank water first thing this morning',       pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_omega3',    label: 'Took omega-3 supplement',                    pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'nutr_vitamins',  label: 'Took prenatal vitamins, mag, vit D',         pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  // Movement
-  { id: 'move_strength',  label: 'Completed a strength training session',      pillar: 'movement',  weight: 4, points: 2, retroactive: false, opensWorkout: true,  priority: true  },
-  { id: 'move_other',     label: 'Completed another workout',                  pillar: 'movement',  weight: 2, points: 1, retroactive: false, opensWorkout: true,  priority: false },
-  { id: 'move_walk',      label: 'Morning dog walk',                           pillar: 'movement',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'sleep', alsoWeight: 1 },
-  { id: 'move_mobility',  label: 'Did mobility work or stretching',            pillar: 'movement',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'stress', alsoWeight: 1 },
-  // Stress & Recovery
-  { id: 'stress_outside', label: 'Got outside today (non-workout time)',       pillar: 'stress',    weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'stress_me',      label: 'Did one thing just for me',                  pillar: 'stress',    weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  { id: 'stress_task',    label: 'Made progress on one non-baby task',         pillar: 'stress',    weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
-  // Optional habits — off by default
-  { id: 'nutr_enough',    label: 'Ate enough to support energy and recovery',  pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, enabled: false },
+  // Sleep
+  { id: 'sleep_bed',       label: 'In bed by 10:30pm',                           pillar: 'sleep',     weight: 3, points: 2, retroactive: true,  opensWorkout: false, priority: false },
+  { id: 'sleep_wake',      label: 'Woke up within 30 min of usual wake time',    pillar: 'sleep',     weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'sleep_caffeine',  label: 'No caffeine after 1pm',                       pillar: 'sleep',     weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'sleep_morning',   label: 'Got outside in the morning',                  pillar: 'sleep',     weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  // Nutrition — core first
+  { id: 'nutr_protein',    label: 'Hit protein target today',                    pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_heart',      label: 'Heart-healthy plate today',                   pillar: 'nutrition', weight: 3, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_fiber',      label: 'Soluble fiber today',                         pillar: 'nutrition', weight: 2, points: 2, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_lunch',      label: 'Protein and plants at lunch',                 pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_dinner',     label: 'Protein and plants at dinner',                pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_omega3',     label: 'Omega-3 source today',                        pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_alcohol',    label: 'Alcohol-free today',                          pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_no_eat',     label: 'Planned evening eating',                      pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_no_junk',    label: 'No processed meat today',                     pillar: 'nutrition', weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'nutr_nuts',       label: 'Nuts or legumes today',                       pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  // Training
+  { id: 'train_plan',      label: 'Followed my training plan today',             pillar: 'training',  weight: 4, points: 3, retroactive: false, opensWorkout: true,  priority: true  },
+  { id: 'train_movement',  label: 'Movement floor hit today',                    pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'train_cardio',    label: 'Cardio or conditioning session',              pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: true,  priority: false },
+  { id: 'train_mobility',  label: 'Mobility or stretching',                      pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'recovery', alsoWeight: 1 },
+  { id: 'train_easy',      label: 'Easy movement today',                         pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  // Recovery
+  { id: 'rec_outside',     label: 'Got outside today (non-workout)',             pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_stress',      label: 'Managed stress today',                        pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_me',          label: 'Did one thing just for me',                   pillar: 'recovery',  weight: 2, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'rec_task',        label: 'Made progress on one non-work task',          pillar: 'recovery',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
 ];
 
 const HABIT_RATIONALE = {
-  sleep_bed:     "Sleep timing affects circadian rhythm, which regulates hunger hormones and energy metabolism. Research consistently links adequate sleep with better weight management, though the effect size varies between individuals.",
-  sleep_wake:    "Consistent wake time is one of the strongest anchors for circadian rhythm stability. Evidence from sleep research suggests this matters more for sleep quality than bedtime alone, though both contribute.",
-  sleep_caffeine:"Caffeine has a half-life of roughly 5 to 6 hours, meaning afternoon caffeine can still be active at bedtime. A 2013 study found caffeine taken 6 hours before bed reduced sleep by about one hour -- individual sensitivity varies considerably.",
-  nutr_breakfast:"Higher protein intake at breakfast is associated with reduced hunger later in the day in several studies, likely through effects on satiety hormones. Evidence is reasonably strong for appetite regulation, though direct effects on weight loss are moderate.",
-  nutr_fiber:    "Dietary fiber is associated with improved satiety, better blood sugar regulation, and gut health. Evidence for these effects is strong and consistent. Most people consume significantly less than the recommended 25 to 30g per day.",
-  nutr_no_eat:   "Time-restricted eating has some evidence for metabolic benefits, particularly around circadian alignment of food intake. However, randomised trials comparing it to general calorie reduction show mixed results. The main benefit here may be reducing unplanned evening snacking. If you are breastfeeding or genuinely hungry, eating enough always takes priority.",
-  nutr_no_junk:  "Processed meats are classified as Group 1 carcinogens by WHO IARC, meaning there is sufficient evidence of a link to colorectal cancer. This classification reflects strength of evidence, not that the absolute risk is large. Occasional consumption carries low absolute risk; regular daily consumption is what the evidence flags.",
-  nutr_alcohol:  "Alcohol is associated with disrupted sleep architecture even in small amounts, and evidence links regular consumption to increased risk of several cancers including breast cancer. The evidence for sleep disruption is strong. Cancer risk evidence is consistent across large studies, though absolute individual risk depends on many factors.",
-  nutr_lunch:    "Meals centred on protein and vegetables tend to be more satiating and lower in energy density than carbohydrate-centred meals. Evidence for this pattern is consistent across multiple study designs.",
-  nutr_dinner:   "Protein and vegetable-centred meals support satiety and provide nutrient density. Ending the day with this pattern also supports your evening eating cutoff.",
-  nutr_water:    "Starting the day with water supports hydration after overnight fasting and can help establish a consistent morning routine. Evidence for specific weight loss effects is weak -- the main benefit is practical habit anchoring.",
-  nutr_omega3:   "DHA and EPA (omega-3 fatty acids) are depleted during pregnancy and breastfeeding. Evidence supports supplementation for maternal mood and infant neurodevelopment. Direct effects on postpartum weight loss are not well established.",
-  nutr_vitamins: "Pregnancy and breastfeeding increase nutrient demands, and deficiencies in vitamin D, magnesium, and other micronutrients are common postpartum. Supplementation is supported by clinical guidelines for breastfeeding mothers. Evidence for direct weight loss effects is limited -- the benefit is nutritional adequacy during recovery.",
-  nutr_enough:   "Adequate calorie intake is essential for postpartum recovery, breastfeeding, and hormonal health. Restriction below energy needs can impair milk supply, increase fatigue, and disrupt hormonal recovery. This habit is a reminder that nourishment is foundational -- not optional.",
-  move_strength: "Resistance training preserves lean muscle mass during weight loss, which protects resting metabolic rate. Evidence for this is strong and consistent. ACOG recommends at least 150 minutes of moderate aerobic activity weekly postpartum, with strength training as a beneficial addition when tolerated.",
-  move_other:    "Regular movement across different modalities supports cardiovascular health, mood, and stress recovery. Consistency over time matters more than intensity or type for long-term health outcomes.",
-  move_walk:     "Walking combines light movement, morning light exposure, and time outdoors -- all associated with modest benefits for mood, circadian rhythm, and general activity levels. Evidence for each component individually is reasonable.",
-  move_mobility: "Postpartum connective tissue recovery takes time. Regular mobility work supports injury prevention and movement quality. Evidence for specific postpartum benefits is limited but general evidence for flexibility and injury prevention is consistent.",
-  stress_outside:"Time in natural environments is associated with lower self-reported stress and improved mood in several studies. Effect sizes are modest and most studies are observational, but the evidence is reasonably consistent and the cost of the habit is low.",
-  stress_me:     "Postpartum identity preservation -- maintaining activities outside the caregiving role -- is associated with better mental health outcomes in qualitative and longitudinal research. Evidence is primarily from observational studies.",
-  stress_task:   "A sense of agency and accomplishment outside caregiving is associated with lower postpartum distress in observational research. This habit is about psychological recovery, not productivity.",
+  sleep_bed:      "Sleep supports training recovery, appetite regulation, and hormonal patterns relevant to muscle building. Experimental studies suggest sleep restriction reduces muscle protein synthesis and lowers testosterone, though the exact size of these effects varies between studies. Consistently getting 7 to 9 hours is the recommendation with the strongest evidence base for active men. Evidence quality: moderate to strong.",
+  sleep_wake:     "Consistent wake time is one of the more reliable anchors for circadian rhythm stability. This stabilizes sleep architecture over time and supports consistent hormonal patterns. Evidence quality: moderate.",
+  sleep_caffeine: "Caffeine has a half-life of roughly 5 to 6 hours. A 2013 controlled study found caffeine taken 6 hours before bed reduced total sleep by approximately one hour. Individual metabolism varies considerably. Evidence quality: moderate.",
+  sleep_morning:  "Morning light exposure helps regulate circadian timing, which supports sleep quality and consistent sleep patterns. Most supporting studies are small. The habit also adds low-intensity movement. Evidence quality: moderate.",
+  nutr_protein:   "Protein is the primary nutritional lever for body recomposition. Research supports roughly 0.7 to 1g per pound of bodyweight for people combining resistance training with fat loss goals. A randomized trial by Longland et al. (2016) found that higher protein intake during an energy deficit combined with exercise led to greater lean mass gain and more fat loss than lower protein intake. The ISSN position stand (2017) supports 1.4 to 2.0g per kg per day for exercising individuals. Evidence quality: strong.",
+  nutr_heart:     "Heart-healthy eating for high cholesterol primarily means limiting saturated fat, which raises LDL, avoiding processed meats, and increasing plant foods and fiber. The American Heart Association recommends limiting saturated fat to less than 6% of total calories for people following a heart-healthy pattern. Evidence for dietary saturated fat and LDL is strong and consistent across decades of research. Examples: olive oil instead of butter, lean or plant proteins, plenty of vegetables.",
+  nutr_fiber:     "Soluble fiber (found in oats, beans, lentils, psyllium, barley, apples, chia, flaxseed) reduces LDL cholesterol through bile acid binding in the gut. A 2023 meta-analysis of 181 RCTs found soluble fiber supplementation reduced LDL by an average of 8.28 mg/dL. Each additional 5g per day reduced LDL by approximately 5.57 mg/dL. Evidence quality: strong.",
+  nutr_lunch:     "Protein and vegetable-centred meals support satiety, provide fiber and micronutrients, and reduce reliance on refined carbohydrates. Evidence for meal composition effects on satiety is reasonably consistent.",
+  nutr_dinner:    "Same logic as lunch. Ending the day with protein and plants fits within a heart-healthy pattern and supports muscle protein synthesis overnight.",
+  nutr_omega3:    "Omega-3 fatty acids (EPA and DHA) reliably reduce triglycerides, a cardiovascular risk factor alongside cholesterol. Evidence for triglyceride reduction is strong. Evidence for direct LDL reduction is weaker and inconsistent. Good food sources include salmon, sardines, mackerel, trout, chia seeds, flaxseed, and walnuts. Evidence quality: strong for triglycerides, moderate for other cardiovascular outcomes.",
+  nutr_alcohol:   "Alcohol raises triglycerides, disrupts sleep architecture, and contributes calories without nutritional value relevant to body recomposition. Regular consumption is linked to increased cancer risk in observational research. Evidence quality: strong for sleep and triglycerides.",
+  nutr_no_eat:    "The goal is not fasting for its own sake -- it is making evening food intake intentional rather than reactive. Randomized trials comparing time-restricted eating to standard calorie management show mixed results. The practical benefit is likely reducing unplanned snacking. Evidence quality: mixed for metabolic benefits, reasonable for reducing unplanned intake.",
+  nutr_no_junk:   "Processed meats are classified as Group 1 carcinogens by WHO IARC, meaning there is sufficient evidence of a link to colorectal cancer. This classification reflects strength of evidence, not that absolute risk is large. Regular daily consumption is what the evidence flags. Processed meats also tend to be high in sodium and saturated fat, relevant for cardiovascular health.",
+  nutr_nuts:      "Nuts and legumes are associated with lower cardiovascular risk in large observational studies. They provide fiber, plant protein, healthy fats, and minerals. A serving of nuts daily is part of several evidence-based heart-healthy dietary patterns including the Mediterranean diet. Evidence quality: moderate to strong from observational research.",
+  train_plan:     "Resistance training is the foundation of body recomposition. It stimulates muscle protein synthesis, increases lean mass, raises resting metabolic rate, and improves insulin sensitivity. ACSM recommends training each muscle group 2 to 3 times per week for hypertrophy, with at least 48 hours between sessions for the same muscle groups. Progressive overload -- gradually increasing load or volume -- is necessary for continued adaptation. Rest days are part of the plan. Evidence quality: very strong.",
+  train_movement: "Low-intensity movement throughout the day (sometimes called NEAT -- non-exercise activity thermogenesis) contributes to total daily energy expenditure and cardiovascular health independently of structured exercise. A daily walk or movement snack adds activity without meaningfully impairing recovery from strength training. Evidence quality: moderate.",
+  train_cardio:   "Cardiovascular exercise supports heart health, improves VO2 max, and helps manage triglycerides and blood pressure. It is complementary to strength training for body recomposition but secondary to it for muscle building specifically. Evidence quality: strong for cardiovascular health.",
+  train_mobility: "Regular mobility work supports joint health, movement quality, and injury prevention. Injury prevention protects training consistency, which is the variable that matters most over time. Evidence for specific hypertrophy benefits is limited. Evidence quality: moderate for injury prevention.",
+  train_easy:     "Light movement on rest days supports blood flow, reduces muscle soreness, and keeps daily activity levels consistent. Evidence is modest -- the main benefit is staying active without accumulating training fatigue. Evidence quality: limited.",
+  rec_outside:    "Time in natural environments is associated with lower self-reported stress and improved mood in multiple observational studies. Effect sizes are modest. Evidence quality: moderate, primarily observational.",
+  rec_stress:     "Chronic psychological stress raises cortisol, which at sustained elevated levels can impair recovery and hormonal health. Stress management is a supporting factor for body recomposition rather than a primary driver. Evidence quality: moderate.",
+  rec_me:         "Maintaining activities outside of work or obligations supports mental health and long-term habit sustainability. Evidence is primarily from wellbeing research.",
+  rec_task:       "A sense of agency and progress outside primary obligations is associated with lower chronic stress in observational research.",
 };
 
 const PILLAR_META = {
-  sleep:     { label: 'Sleep',           colorClass: 'blue', dotClass: 'sleep'     },
-  nutrition: { label: 'Nutrition',       colorClass: 'sage', dotClass: 'nutrition' },
-  movement:  { label: 'Movement',        colorClass: 'rose', dotClass: 'movement'  },
-  stress:    { label: 'Stress & Recovery', colorClass: 'sand', dotClass: 'stress'  },
+  sleep:     { label: 'Sleep',     colorClass: 'blue', dotClass: 'sleep'    },
+  nutrition: { label: 'Nutrition', colorClass: 'sage', dotClass: 'nutrition'},
+  training:  { label: 'Training',  colorClass: 'rose', dotClass: 'training' },
+  recovery:  { label: 'Recovery',  colorClass: 'sand', dotClass: 'recovery' },
 };
 
 const DEFAULT_ACTIVITIES = [
-  { id: 'strength',    label: 'Strength training', priority: true  },
-  { id: 'spin',        label: 'Spin / Cycling',    priority: false },
+  { id: 'strength',    label: 'Strength training',   priority: true  },
+  { id: 'conditioning',label: 'Conditioning',        priority: false },
+  { id: 'cardio',      label: 'Cardio',              priority: false },
   { id: 'functional',  label: 'Functional training', priority: false },
-  { id: 'bodyweight',  label: 'Bodyweight',         priority: false },
-  { id: 'yoga',        label: 'Yoga',               priority: false },
-  { id: 'walk',        label: 'Walk',               priority: false },
-  { id: 'core',        label: 'Core',               priority: false },
-  { id: 'other',       label: 'Other',              priority: false },
+  { id: 'bodyweight',  label: 'Bodyweight',          priority: false },
+  { id: 'mobility',    label: 'Mobility',            priority: false },
+  { id: 'walk',        label: 'Walk',                priority: false },
+  { id: 'other',       label: 'Other',               priority: false },
 ];
 
-/* The 6 habits with strongest direct evidence for weight loss */
-const CORE_HABIT_IDS = ['sleep_bed', 'nutr_breakfast', 'nutr_no_eat', 'nutr_lunch', 'nutr_dinner', 'move_strength'];
+/* The 6 core habits for body recomposition and heart health */
+const CORE_HABIT_IDS = ['train_plan', 'nutr_protein', 'nutr_heart', 'nutr_fiber', 'sleep_bed', 'train_movement'];
 
 const CORE_HABIT_PUSHBACK = {
-  nutr_breakfast: "This is one of the highest-leverage habits for appetite control. Are you sure?",
-  nutr_no_eat:    "This habit directly supports your fasting window. Are you sure?",
-  move_strength:  "Strength training protects your metabolic rate during weight loss more than any other exercise. Are you sure?",
-  sleep_bed:      "Earlier bedtime is one of the highest-leverage changes for postpartum cortisol and hunger control. Are you sure?",
-  nutr_lunch:     "Protein and plants at lunch is one of the anchors of your nutrition approach. Are you sure?",
-  nutr_dinner:    "Ending the day with protein and plants supports your fasting window and overnight recovery. Are you sure?",
+  train_plan:   "Consistent resistance training is the foundation of body recomposition. Without it, fat loss tends to include muscle loss. Are you sure?",
+  nutr_protein: "Protein is one of the most consistently supported nutritional levers for recomposition -- particularly for preserving lean mass during fat loss. Are you sure?",
+  nutr_fiber:   "Soluble fiber has strong evidence for LDL reduction, one of the most effective dietary interventions for high cholesterol. Are you sure?",
+  nutr_heart:   "Heart-healthy eating patterns are the primary dietary lever for cardiovascular risk alongside medication. Are you sure?",
+  sleep_bed:    "Sleep restriction reduces muscle protein synthesis and impairs recovery. It is a meaningful lever for both body composition and cardiovascular health. Are you sure?",
 };
 
 const BADGE_DEFINITIONS = [
@@ -154,11 +156,19 @@ const DEFAULT_SETTINGS = {
   goalWeightLow: null,
   goalWeightHigh: null,
   appStartDate: dateStr(new Date()),
-  breastfeeding: false,
+  primaryGoal: 'recomposition', // 'recomposition' | 'build_muscle' | 'lose_fat'
+  age: null,
   usualWakeTime: '07:00',
   eatCutoff: '19:00',
   bedtimeTarget: '22:30',
   caffeineCutoff: '13:00',
+  // Protein target
+  proteinTargetG: null,
+  proteinCalcMethod: 'current', // 'current' | 'target' | 'manual'
+  // Training plan
+  weeklySessionTarget: 3,
+  trainingSplit: 'full_body', // 'full_body' | 'upper_lower' | 'ppl' | 'ppl_ul' | 'custom'
+  customSplitDays: [],
   pointsConversionRate: 0.50,
   // Optional features
   featNotifications: true,
@@ -166,6 +176,7 @@ const DEFAULT_SETTINGS = {
   featMoodLog: false,
   featProgressPhotos: false,
   featMeasurements: false,
+  featCardioMarkers: false,
   // Notification toggles
   notifStreakProtection: false,
   notifWeighIn: false,
@@ -184,14 +195,14 @@ const DEFAULT_SETTINGS = {
 const Store = {
   get(key, fallback = null) {
     try {
-      const v = localStorage.getItem('bloom_' + key);
+      const v = localStorage.getItem('root_' + key);
       return v === null ? fallback : JSON.parse(v);
     } catch { return fallback; }
   },
   set(key, val) {
-    try { localStorage.setItem('bloom_' + key, JSON.stringify(val)); } catch {}
+    try { localStorage.setItem('root_' + key, JSON.stringify(val)); } catch {}
   },
-  remove(key) { localStorage.removeItem('bloom_' + key); },
+  remove(key) { localStorage.removeItem('root_' + key); },
 
   getSettings()   { return { ...DEFAULT_SETTINGS, ...this.get('settings', {}) }; },
   saveSettings(s) { this.set('settings', s); SheetsSync.schedule(); },
@@ -237,18 +248,16 @@ const Store = {
     if (!stored) return DEFAULT_HABITS.map(h => ({...h}));
 
     const LABEL_MIGRATIONS = [
-      { id: 'nutr_breakfast', newPoints: 2 },
-      { id: 'nutr_fiber',     oldLabels: ['Had a high-fiber food today', 'Approx 30g of fiber throughout day'],    newLabel: 'Approx 25 to 30g fiber throughout day', newPoints: 2 },
-      { id: 'nutr_no_eat',    oldLabels: ['No eating after', 'Evening eating cutoff ('],                          newLabel: 'Evening eating cutoff', newPoints: 2 },
-      { id: 'nutr_no_junk',   oldLabels: ['Avoided ultra-processed snacks','No processed meats or packaged snack foods','No processed meat or packaged snack foods today'], newLabel: 'No processed meat today' },
-      { id: 'nutr_lunch',     oldLabels: ['Protein and veg forward at lunch', 'Protein and vegetables at lunch'],  newLabel: 'Protein and plants at lunch' },
-      { id: 'nutr_dinner',    oldLabels: ['Protein and veg forward at dinner', 'Protein and vegetables at dinner'], newLabel: 'Protein and plants at dinner' },
-      // move_walk: alsoContributes changed from stress → sleep
-      { id: 'move_walk',      newAlso: 'sleep', newAlsoWeight: 1 },
+      // Root migrations from Bloom habit IDs
+      { id: 'nutr_fiber',    oldLabels: ['Approx 25 to 30g fiber throughout day'], newLabel: 'Soluble fiber today' },
+      { id: 'nutr_no_eat',   oldLabels: ['Evening eating cutoff'],                 newLabel: 'Planned evening eating' },
+      { id: 'nutr_no_junk',  oldLabels: ['No processed meat today'],               newLabel: 'No processed meat today' },
     ];
 
-    // Remove retired habits (sleep_outside merged into move_walk)
-    const RETIRED = ['sleep_outside'];
+    // Remove retired habits from Bloom
+    const RETIRED = ['sleep_outside', 'nutr_breakfast', 'nutr_water', 'nutr_vitamins', 'nutr_enough',
+                     'move_strength', 'move_other', 'move_walk', 'move_mobility',
+                     'stress_outside', 'stress_me', 'stress_task'];
 
     // Collect custom habits to preserve at end of their pillar
     let migrated = stored
@@ -479,8 +488,8 @@ const Badges = {
 
     // 30 days of check-ins
     const habitKeys = Object.keys(localStorage)
-      .filter(k => k.startsWith('bloom_habits_'))
-      .map(k => k.replace('bloom_habits_', ''));
+      .filter(k => k.startsWith('root_habits_'))
+      .map(k => k.replace('root_habits_', ''));
     if (habitKeys.length >= 30) award('checkins_30');
     if (habitKeys.length >= 7)  award('first_full_week');
 
@@ -527,7 +536,7 @@ const Streak = {
     const allDates = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith('bloom_habits_')) allDates.push(k.replace('bloom_habits_', ''));
+      if (k.startsWith('root_habits_')) allDates.push(k.replace('root_habits_', ''));
     }
     const streakDays = new Set(allDates.filter(d => this.isStreakDay(d)));
 
@@ -628,13 +637,11 @@ const Streak = {
 /* ─── Temptation Bundling ────────────────────────────────────────────────── */
 
 const TBUNDLE_PROMPTS = {
-  move_walk:      "What do you like on walks — a podcast, music, a call, or just quiet?",
-  move_strength:  "What makes your workouts feel good — music, a show, silence, working out with someone?",
-  move_other:     "What do you pair with this workout to look forward to it?",
-  move_mobility:  "What helps this feel like downtime — a show, music, or just quiet time?",
-  stress_outside: "What makes outside time feel like a break for you?",
-  nutr_breakfast: "What's already part of your morning you could do this alongside?",
-  nutr_water:     "What do you always do first thing that you could pair this with?",
+  train_plan:     "What makes your workouts feel good -- music, a show, silence, working out with someone?",
+  train_cardio:   "What do you pair with this session to look forward to it?",
+  train_easy:     "What do you like during easy movement -- a podcast, music, a call, or just quiet?",
+  train_mobility: "What helps this feel like downtime -- a show, music, or just quiet time?",
+  rec_outside:    "What makes outside time feel like a genuine break for you?",
   nutr_omega3:    "What's your most automatic morning habit you could stack this onto?",
   nutr_vitamins:  "What's your most automatic morning habit you could stack this onto?",
   sleep_bed:      "What helps you wind down — a show, reading, music, something else?",
@@ -663,8 +670,8 @@ const TBundle = {
     let count = 0;
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k.startsWith('bloom_habits_')) continue;
-      if (Store.get(k.replace('bloom_', ''), {})[habitId]) count++;
+      if (!k.startsWith('root_habits_')) continue;
+      if (Store.get(k.replace('root_', ''), {})[habitId]) count++;
     }
     return count;
   },
@@ -779,10 +786,10 @@ function markPlateauCheckinDone() {
   Store.set('plateau_checkin_week', dateStr(getWeekStart()));
 }
 
-// Domain averages over last 4 weeks (returns {sleep,nutrition,movement,stress} 0-100)
+// Domain averages over last 4 weeks (returns {sleep,nutrition,training,recovery} 0-100)
 function last4WeeksDomainAvgs() {
   const habits = Store.getHabitDefs().filter(h => h.enabled !== false);
-  const pillars = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
   const weeks4 = Array.from({ length: 4 }, (_, i) => {
     const ws = new Date(getWeekStart());
     ws.setDate(ws.getDate() - (7 * (3 - i)));
@@ -817,7 +824,7 @@ function _plateauStep1(body) {
     .slice(0, 4)
     .filter(([, v]) => v);
 
-  const domainBars = ['sleep', 'nutrition', 'movement', 'stress'].map(p => {
+  const domainBars = ['sleep', 'nutrition', 'training', 'recovery'].map(p => {
     const meta = PILLAR_META[p];
     const pct  = avgs[p];
     return `
@@ -1190,7 +1197,7 @@ function openRetroChecklist(retroDate) {
       });
     }
 
-    const pillars = ['sleep','nutrition','movement','stress'];
+    const pillars = ['sleep','nutrition','training','recovery'];
     pillars.forEach(pillar => {
       const ph = bonusHabits.filter(h => h.pillar === pillar);
       if (!ph.length) return;
@@ -1314,14 +1321,8 @@ function updatePointsBadge() {
 
 /* ─── Habit Rationale Tooltip ────────────────────────────────────────────── */
 
-const HABIT_RATIONALE_BF = {
-  nutr_water:    "Breastfeeding increases your fluid needs and dehydration can affect milk supply. It also tends to feel a lot like hunger.",
-  nutr_breakfast:"Breastfeeding adds roughly 25g to your daily protein needs. A strong breakfast makes a real dent in that.",
-};
-
 function showRationale(habitId, label) {
-  const bf   = Store.getSettings().breastfeeding;
-  const text = (bf && HABIT_RATIONALE_BF[habitId]) || HABIT_RATIONALE[habitId];
+  const text = HABIT_RATIONALE[habitId];
   if (!text) return;
   const card  = document.getElementById('rationale-card');
   if (!card) return;
@@ -1378,7 +1379,7 @@ const Notifications = {
       if (streak.current > 0) {
         const { done: coreDone } = Streak.getCoreProgress(today);
         if (coreDone < 5) {
-          this.show('Bloom', `Your ${streak.current}-day streak is on the line. You've got time.`);
+          this.show('Root', `Your ${streak.current}-day streak is on the line. You've got time.`);
           fired.streakProtection = true;
         }
       }
@@ -1389,7 +1390,7 @@ const Notifications = {
       const ws  = dateStr(getWeekStart());
       const has = Store.getWeighIns().some(w => w.date >= ws);
       if (!has) {
-        this.show('Bloom', "Weekly weigh-in -- log it while you're thinking about it.");
+        this.show('Root', "Weekly weigh-in -- log it while you're thinking about it.");
         fired.weighIn = true;
       }
     }
@@ -1398,7 +1399,7 @@ const Notifications = {
     if (s.notifBedtime && !fired.bedtime && hour >= 22) {
       const checked = Store.getHabits(today);
       if (!checked['sleep_bed']) {
-        this.show('Bloom', "Bedtime habit -- 30 minutes to your target.");
+        this.show('Root', "Bedtime habit -- 30 minutes to your target.");
         fired.bedtime = true;
       }
     }
@@ -1407,7 +1408,7 @@ const Notifications = {
     if (s.notifMorningCheckin && !fired.morningCheckin && s.notifMorningTime) {
       const [th, tm] = s.notifMorningTime.split(':').map(Number);
       if (hour > th || (hour === th && min >= tm)) {
-        this.show('Bloom', "How's your morning going? Log your habits.");
+        this.show('Root', "How's your morning going? Log your habits.");
         fired.morningCheckin = true;
       }
     }
@@ -2036,8 +2037,7 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
     : '<span class="core-dot core-dot-empty"  aria-hidden="true">○</span>';
 
   // Detail panel content (rationale + bundle note + core tag)
-  const bf          = Store.getSettings().breastfeeding;
-  const rationale   = (bf && HABIT_RATIONALE_BF[id]) || HABIT_RATIONALE[id] || '';
+  const rationale   = HABIT_RATIONALE[id] || '';
   const noteHtml    = bundleNote ? `<p class="bundle-note-display">${escHtml(bundleNote)}</p>` : '';
   const rationaleHtml = rationale ? `<p class="habit-detail-rationale">${escHtml(rationale)}</p>` : '';
   const coreTagHtml = isCore ? `<p class="habit-detail-core">Core commitment</p>` : '';
@@ -2111,7 +2111,7 @@ function renderToday() {
   const nowHour    = new Date().getHours();
   const onTheLine  = nowHour >= 18 && coreDone < 5 && streakData.current > 0;
 
-  const pillars = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
 
   let html = '';
 
@@ -2289,7 +2289,7 @@ function updateStreakDisplay() {
   }
 
   // Update per-pillar counts
-  ['sleep', 'nutrition', 'movement', 'stress'].forEach(pillar => {
+  ['sleep', 'nutrition', 'training', 'recovery'].forEach(pillar => {
     const items = habits.filter(h => h.pillar === pillar);
     const done  = items.filter(h => checked[h.id]).length;
     const el = document.getElementById(`pillar-count-${pillar}`);
@@ -2404,7 +2404,7 @@ function renderWeek() {
   // Pillar bars
   html += `<div class="card">`;
   html += `<div class="card-title">Weekly Domain Progress</div>`;
-  const pillars = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
   pillars.forEach(p => {
     const meta  = PILLAR_META[p];
     const score = pillarScores[p] || 0;
@@ -2420,7 +2420,7 @@ function renderWeek() {
         <div class="progress-bar-wrap">
           <div class="progress-bar-fill ${meta.colorClass}" style="width:${pct}%"></div>
         </div>
-        <div class="pillar-bar-feedback">${getPillarFeedback(p, pct, settings.breastfeeding)}</div>
+        <div class="pillar-bar-feedback">${getPillarFeedback(p, pct)}</div>
       </div>
     `;
   });
@@ -2455,15 +2455,6 @@ function renderWeek() {
     }
     if (settings.mode === 'maintenance') {
       html += `<p class="text-small text-muted mt-8" style="font-style:italic">Consistency keeps you in your range. The habits that got you here are the habits that keep you here.</p>`;
-    }
-    if (settings.breastfeeding) {
-      html += `<p class="text-small text-muted mt-8" style="font-style:italic">Breastfeeding affects when your body lets go of weight. Your habit consistency over time tells a more honest story than any single weigh-in.</p>`;
-      // Plateau note
-      const noChangeSince = weighIns.filter(w => w.date <= today).slice(-3);
-      const plateau = noChangeSince.length >= 3 && noChangeSince.every(w => Math.abs(w.weight - noChangeSince[0].weight) < 0.5);
-      if (plateau) {
-        html += `<p class="text-small text-muted mt-4" style="font-style:italic">Plateaus are common while breastfeeding. Your body holds onto fat as a reserve for milk production and that has nothing to do with how hard you're working.</p>`;
-      }
     }
     html += `<button class="btn btn-sm btn-outline mt-8" id="reweighin-btn">Update</button>`;
     html += `</div>`;
@@ -2597,7 +2588,7 @@ function renderSavingsBar(points, goals, settings) {
 
 function computePillarScores(activeDays, habits) {
   const scores     = {};
-  const pillars    = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars    = ['sleep', 'nutrition', 'training', 'recovery'];
   const activeCount = Math.max(1, activeDays.length);
 
   pillars.forEach(pillar => {
@@ -2627,36 +2618,34 @@ function computePillarScores(activeDays, habits) {
   return scores;
 }
 
-function getPillarFeedback(pillar, pct, bf) {
+function getPillarFeedback(pillar, pct) {
   const feedbacks = {
     sleep: {
       high:   "Sleep discipline is on point this week.",
-      mid:    "Sleep domain is building. The bedtime or caffeine cutoff could push this higher.",
-      low:    "Sleep is your lowest domain this week. Earlier bedtime or cutting caffeine after 1pm are the highest-leverage changes.",
-      lowBF:  "Broken sleep while breastfeeding is mostly out of your control. The things worth focusing on are bedtime and cutting off caffeine early.",
+      mid:    "Sleep is building. Locking in the bedtime or caffeine cutoff would push this higher.",
+      low:    "Sleep is your lowest domain this week. Earlier bedtime and cutting caffeine after 1pm are the highest-leverage moves.",
     },
     nutrition: {
-      high:   "Solid nutrition week. Protein and whole foods are showing up.",
-      mid:    "Nutrition is at halfway. The after-7pm cutoff or protein at breakfast would move this.",
-      low:    "Nutrition domain is low. Start with protein at breakfast — it sets the tone for the day.",
-      lowBF:  "Undereating while breastfeeding can affect milk supply and raise cortisol. The goal is hitting your protein and fiber habits, not cutting back.",
+      high:   "Solid nutrition week. Protein and whole foods are showing up consistently.",
+      mid:    "Nutrition is at halfway. Hitting protein at the first two meals would move this.",
+      low:    "Nutrition is low this week. Start with protein at breakfast -- it anchors the rest of the day.",
     },
-    movement: {
-      high:   "Strong movement week. Strength training is showing up.",
-      mid:    "Halfway on movement. One more strength session would push this higher.",
-      low:    "Movement is your lowest domain this week. Even 20 minutes of weights counts.",
-      lowBF:  "Two strength sessions is a genuine win right now. Your body is producing milk on top of everything else you're asking it to do.",
+    training: {
+      high:   "Strong training week. Consistency is the variable that compounds over months.",
+      mid:    "Halfway on training. One more session or movement floor day would push this higher.",
+      low:    "Training is your lowest domain this week. Even a short strength session or a 20-minute walk counts toward the habit.",
     },
-    stress: {
-      high:   "Recovery is built into your week. That matters.",
-      mid:    "Making progress on stress & recovery. Small things count.",
-      low:    "Stress & recovery is low. One thing just for you today is a start.",
-      lowBF:  "Breastfeeding raises baseline stress hormones even when life feels manageable. These habits are not optional extras.",
+    recovery: {
+      high:   "Recovery is built into your week. That supports the training you're trying to adapt to.",
+      mid:    "Recovery is building. Stress management and time outside are worth protecting.",
+      low:    "Recovery is low this week. One deliberate rest or stress-management habit today is a start.",
     },
   };
   const f = feedbacks[pillar];
-  if (pct >= 50) return pct >= 75 ? f.high : f.mid;
-  return (bf && f.lowBF) ? f.lowBF : f.low;
+  if (!f) return '';
+  if (pct >= 75) return f.high;
+  if (pct >= 50) return f.mid;
+  return f.low;
 }
 
 /* ─── EXERCISE Screen ────────────────────────────────────────────────────── */
@@ -2787,27 +2776,11 @@ function renderProgress() {
     const avgLoss = (recent4[0].weight - recent4[recent4.length-1].weight) / (recent4.length - 1);
     const sign = avgLoss >= 0 ? '-' : '+';
     html += `<div class="avg-loss-stat">Avg change (last 4 weeks): <strong>${sign}${Math.abs(avgLoss).toFixed(1)} lbs/week</strong></div>`;
-    // BF rapid loss flag (> 2 lbs/week)
-    if (settings.breastfeeding && avgLoss > 2) {
-      html += `<p class="text-small mt-4 bf-flag" style="font-style:italic">Your average loss is over 2 lbs per week. Some research links rapid weight loss to reduced milk supply, so it's worth keeping an eye on.</p>`;
-    }
-  }
-  // BF: plateau message (updated text per spec)
-  if (settings.breastfeeding && weighIns.length >= 3) {
-    const last3 = weighIns.slice(-3);
-    const plateau = last3.every(w => Math.abs(w.weight - last3[0].weight) < 0.5);
-    if (plateau) {
-      html += `<p class="text-small text-muted mt-8" style="font-style:italic">Plateaus are common while breastfeeding. Your body holds onto fat as a reserve for milk production and that has nothing to do with how hard you're working.</p>`;
-    }
-  }
-  // BF: persistent notes (always shown when BF mode on)
-  if (settings.breastfeeding) {
-    html += `<p class="text-small text-muted mt-8" style="font-style:italic">While breastfeeding, 0.5 to 1 lb per week is a healthy rate of loss. The last 5 to 10 lbs often don't shift until after weaning and that's completely normal.</p>`;
   }
   html += `</div>`;
 
-  // Plateau check-in banner (non-BF only, 4+ weigh-ins, not already done this week)
-  if (!settings.breastfeeding && detectPlateau(weighIns) && !plateauCheckinDone()) {
+  // Plateau check-in banner (4+ weigh-ins, not already done this week)
+  if (detectPlateau(weighIns) && !plateauCheckinDone()) {
     html += `
       <div class="plateau-banner" id="plateau-banner">
         <div class="plateau-banner-text">Your trend line has been flat for 4 weeks. Take a moment to check in.</div>
@@ -2844,7 +2817,7 @@ function renderProgress() {
     return ws;
   });
   const habits = Store.getHabitDefs().filter(h => h.enabled !== false);
-  const pillars = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
   pillars.forEach(p => {
     const meta = PILLAR_META[p];
     const dots = weeks8.map(ws => {
@@ -2925,9 +2898,6 @@ function renderProgress() {
       if (recent28.length > 0) {
         const avgHrs = recent28.reduce((s, l) => s + (calcSleepHours(l.sleepTime, l.wakeTime) || 0), 0) / recent28.length;
         html += `<div class="avg-loss-stat">Average over last 4 weeks: <strong>${fmtSleepHours(avgHrs)}</strong></div>`;
-      }
-      if (settings.breastfeeding) {
-        html += `<p class="text-small text-muted mt-8" style="font-style:italic">Broken sleep is expected right now. Focus on the trend over weeks, not any single night.</p>`;
       }
       html += `</div>`;
     }
@@ -3057,7 +3027,7 @@ function initSleepChart(logs, settings) {
     return h !== null ? Math.round(h * 10) / 10 : null;
   });
 
-  const target = settings.breastfeeding ? 6 : 7;
+  const target = 7;
 
   const barColors = data.map(h => {
     if (h === null) return 'rgba(200,200,200,0.3)';
@@ -3173,7 +3143,7 @@ async function exportProgressPhotos() {
   for (const p of photos) {
     const a = document.createElement('a');
     a.href = p.dataUrl;
-    a.download = `bloom-photo-${p.date}.jpg`;
+    a.download = `Root-photo-${p.date}.jpg`;
     a.click();
     await new Promise(r => setTimeout(r, 200));
   }
@@ -3307,7 +3277,7 @@ function renderSheetsSyncSection() {
   const connected  = SheetsSync.isConnected();
   const account    = SheetsSync.getAccount();
   const lastSynced = SheetsSync.formatLastSynced();
-  const needsReauth = !!localStorage.getItem('bloom_google_reauth_needed');
+  const needsReauth = !!localStorage.getItem('root_google_reauth_needed');
   const pending    = SheetsSync.getQueue().length > 0;
 
   if (!connected) {
@@ -3354,9 +3324,9 @@ function renderSettings() {
 
     <div class="settings-section">
       <div class="settings-group">
-        <div class="settings-btn-row" id="s-how-bloom-works" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="settings-btn-row" id="s-how-Root-works" style="display:flex;align-items:center;justify-content:space-between">
           <div>
-            <div class="settings-btn-label" style="font-weight:600">How Bloom works</div>
+            <div class="settings-btn-label" style="font-weight:600">How Root works</div>
             <div class="settings-btn-desc">The domains, the scoring, the evidence</div>
           </div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text-light);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
@@ -3398,28 +3368,12 @@ function renderSettings() {
     </div>
 
     <div class="settings-section">
-      <div class="settings-section-title">Health</div>
+      <div class="settings-section-title">Time Cutoffs</div>
       <div class="settings-group">
-        <div class="toggle-row" style="padding:13px 16px">
-          <div>
-            <div class="toggle-label">Breastfeeding mode</div>
-            <div class="toggle-sublabel">Adjusts guidance and messaging throughout the app to reflect breastfeeding.</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="s-bf" ${s.breastfeeding ? 'checked' : ''}>
-            <div class="toggle-track"></div>
-          </label>
-        </div>
         <div class="settings-row">
           <div class="settings-row-label">Usual wake time</div>
           <input class="settings-row-input" id="s-wake" type="time" value="${s.usualWakeTime || '07:00'}">
         </div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-section-title">Time Cutoffs</div>
-      <div class="settings-group">
         <div class="settings-row">
           <div class="settings-row-label">Bedtime target</div>
           <input class="settings-row-input" id="s-bedtime" type="time" value="${s.bedtimeTarget || '22:30'}">
@@ -3428,7 +3382,6 @@ function renderSettings() {
           <div class="settings-row-label">Eating cutoff</div>
           <input class="settings-row-input" id="s-eat-cutoff" type="time" value="${s.eatCutoff || '19:00'}">
         </div>
-        <p class="settings-note">If you are breastfeeding or genuinely hungry in the evening, eating enough always takes priority over this cutoff.</p>
         <div class="settings-row">
           <div class="settings-row-label">Caffeine cutoff</div>
           <input class="settings-row-input" id="s-caffeine-cutoff" type="time" value="${s.caffeineCutoff || '13:00'}">
@@ -3588,34 +3541,6 @@ function renderSettings() {
     });
   });
 
-  screen.querySelector('#s-bf')?.addEventListener('change', e => {
-    const s = Store.getSettings();
-    if (e.target.checked && !Store.get('bloom_bf_safety_seen')) {
-      // Show safety card once
-      e.target.checked = false; // hold off until user confirms
-      openModal(body => {
-        body.innerHTML = `
-          <h2 class="modal-title">A note on breastfeeding and weight loss</h2>
-          <p style="margin:0 0 12px;font-size:14px;line-height:1.6">Breastfeeding increases your daily calorie needs. Most guidelines suggest an additional 300 to 500 kcal per day. Restricting calories too aggressively while breastfeeding can reduce milk supply and affect your energy and recovery.</p>
-          <p style="margin:0 0 12px;font-size:14px;line-height:1.6">Bloom will adjust your sleep reference line and show a reminder on the eating cutoff setting. However, all targets in Bloom are guides, not rules. If you are hungry, eat. If a habit conflicts with feeding your baby or your own energy needs, skip it.</p>
-          <p style="margin:0 0 20px;font-size:14px;line-height:1.6">If you have concerns about weight management while breastfeeding, a registered dietitian or your midwife or OB can give personalised guidance.</p>
-          <button class="btn-primary" id="bf-safety-ok" style="width:100%">Got it</button>
-        `;
-        body.querySelector('#bf-safety-ok').addEventListener('click', () => {
-          Store.set('bloom_bf_safety_seen', true);
-          const s2 = Store.getSettings();
-          s2.breastfeeding = true;
-          Store.saveSettings(s2);
-          const cb = screen.querySelector('#s-bf');
-          if (cb) cb.checked = true;
-          closeModal();
-        });
-      });
-      return;
-    }
-    s.breastfeeding = e.target.checked;
-    Store.saveSettings(s);
-  });
 
   // Optional feature toggles
   const featToggles = [
@@ -3680,7 +3605,7 @@ function renderSettings() {
     updateHeader();
   });
 
-  screen.querySelector('#s-how-bloom-works')?.addEventListener('click', openHowBloomWorks);
+  screen.querySelector('#s-how-Root-works')?.addEventListener('click', openHowRootWorks);
   screen.querySelector('#s-set-goal')?.addEventListener('click', openGoalModal);
   screen.querySelector('#s-manual-points')?.addEventListener('click', openManualPointsModal);
   screen.querySelector('#s-habits')?.addEventListener('click', openHabitsCustomizer);
@@ -3906,7 +3831,7 @@ function saveWorkout() {
   showToast(`Workout logged! +${pts} pt${pts > 1 ? 's' : ''}`, 'success');
 
   // Update habit for the workout date
-  const habitKey = workout.priority ? 'move_strength' : 'move_other';
+  const habitKey = workout.priority ? 'train_plan' : 'train_cardio';
   const hChecked = Store.getHabits(workoutDate);
   if (!hChecked[habitKey]) {
     hChecked[habitKey] = true;
@@ -4178,7 +4103,7 @@ function openIntentionModal(wsStr) {
       <div class="modal-title">What's your focus this week?</div>
       <p class="text-muted text-small mb-16">Pick a domain to prioritize, or write a short intention.</p>
       <div class="pillar-choice-grid">
-        ${['sleep','nutrition','movement','stress'].map(p => `
+        ${['sleep','nutrition','training','recovery'].map(p => `
           <button class="pillar-choice-btn" data-pillar="${p}">
             <div class="dot pillar-dot ${p}"></div>
             ${PILLAR_META[p].label}
@@ -4282,7 +4207,7 @@ function openHabitsCustomizer() {
 
 function renderHabitsCustomizerBody(body) {
   const habits  = Store.getHabitDefs();
-  const pillars = ['sleep', 'nutrition', 'movement', 'stress'];
+  const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
 
   let html = `<div class="modal-title">Customize Habits</div>`;
   pillars.forEach(p => {
@@ -4435,7 +4360,7 @@ function renderHabitsCustomizerBody(body) {
           <div class="form-group">
             <label class="form-label">Domain</label>
             <select class="form-input form-select" id="new-habit-pillar">
-              ${['sleep','nutrition','movement','stress'].map(p =>
+              ${['sleep','nutrition','training','recovery'].map(p =>
                 `<option value="${p}" ${p === pillar ? 'selected' : ''}>${PILLAR_META[p].label}</option>`
               ).join('')}
             </select>
@@ -4444,7 +4369,7 @@ function renderHabitsCustomizerBody(body) {
             <label class="form-label">Also contributes to <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
             <select class="form-input form-select" id="new-habit-also">
               <option value="">— None —</option>
-              ${['sleep','nutrition','movement','stress'].filter(p => p !== pillar).map(p =>
+              ${['sleep','nutrition','training','recovery'].filter(p => p !== pillar).map(p =>
                 `<option value="${p}">${PILLAR_META[p].label}</option>`
               ).join('')}
             </select>
@@ -4465,7 +4390,7 @@ function renderHabitsCustomizerBody(body) {
           const also = b.querySelector('#new-habit-also');
           const prev = also.value;
           also.innerHTML = `<option value="">— None —</option>` +
-            ['sleep','nutrition','movement','stress'].filter(p => p !== chosen).map(p =>
+            ['sleep','nutrition','training','recovery'].filter(p => p !== chosen).map(p =>
               `<option value="${p}" ${p === prev && p !== chosen ? 'selected' : ''}>${PILLAR_META[p].label}</option>`
             ).join('');
         });
@@ -4601,8 +4526,8 @@ function importData() {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        const keys = Object.keys(data).filter(k => k.startsWith('bloom_'));
-        if (keys.length === 0) { showToast('No Bloom data found in that file.'); return; }
+        const keys = Object.keys(data).filter(k => k.startsWith('root_'));
+        if (keys.length === 0) { showToast('No Root data found in that file.'); return; }
         openConfirm(
           'Import and overwrite?',
           `This will replace all current data with the backup (${keys.length} items). This cannot be undone.`,
@@ -4615,7 +4540,7 @@ function importData() {
           true
         );
       } catch {
-        showToast('Could not read that file. Make sure it\'s a Bloom JSON export.');
+        showToast('Could not read that file. Make sure it\'s a Root JSON export.');
       }
     };
     reader.readAsText(file);
@@ -4627,13 +4552,13 @@ function exportData() {
   const data = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k.startsWith('bloom_')) data[k] = localStorage.getItem(k);
+    if (k.startsWith('root_')) data[k] = localStorage.getItem(k);
   }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = `bloom-backup-${todayStr()}.json`;
+  a.download = `Root-backup-${todayStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Data exported!', 'success');
@@ -4642,7 +4567,7 @@ function exportData() {
 function resetAllData() {
   const keys = [];
   for (let i = 0; i < localStorage.length; i++) {
-    if (localStorage.key(i).startsWith('bloom_')) keys.push(localStorage.key(i));
+    if (localStorage.key(i).startsWith('root_')) keys.push(localStorage.key(i));
   }
   keys.forEach(k => localStorage.removeItem(k));
   showToast('All data deleted.');
@@ -4672,11 +4597,11 @@ const HINTS = {
   today:    "Tap the checkbox to check off a habit. Tap the habit name to see the science behind it.",
   week:     "These bars update as you check off habits each day. They reflect your week so far — not how much of the week is left.",
   exercise: "Log any workout in three taps. Strength sessions are weighted as the priority domain for body composition.",
-  progress: "The trend line matters more than individual weeks — especially postpartum. Focus on the direction, not the number.",
+  progress: "The trend line matters more than individual weeks. Body recomposition is slow -- focus on the direction, not any single data point.",
 };
 
 function showHintIfNeeded(screen) {
-  const key = `bloom_hint_${screen}_seen`;
+  const key = `root_hint_${screen}_seen`;
   if (localStorage.getItem(key)) return;
   const text = HINTS[screen];
   if (!text) return;
@@ -4696,12 +4621,12 @@ function showHintIfNeeded(screen) {
   if (screenEl) screenEl.insertAdjacentElement('afterbegin', hint);
 }
 
-/* ─── How Bloom Works ────────────────────────────────────────────────────── */
+/* ─── How Root Works ────────────────────────────────────────────────────── */
 
-function openHowBloomWorks() {
+function openHowRootWorks() {
   openModal(body => {
     body.innerHTML = `
-      <div class="modal-title">How Bloom works</div>
+      <div class="modal-title">How Root works</div>
 
       <div class="how-section">
         <div class="how-heading">The daily check-in</div>
@@ -4710,12 +4635,12 @@ function openHowBloomWorks() {
 
       <div class="how-section">
         <div class="how-heading">Your core habits and bonus habits</div>
-        <p>Six habits are marked as core commitments: bedtime, protein breakfast, evening eating cutoff, protein and plants at lunch and dinner, and strength training. Completing at least five of those six is what counts as a streak day. Everything else on your list is a bonus habit. Bonus habits still earn points and contribute to your domain bars -- they just don't affect the streak.</p>
+        <p>Six habits are marked as core commitments: followed training plan, hit protein target, heart-healthy plate, soluble fiber, in bed by target time, and movement floor. Completing at least five of those six is what counts as a streak day. Everything else on your list is a bonus habit. Bonus habits still earn points and contribute to your domain bars -- they just don't affect the streak.</p>
       </div>
 
       <div class="how-section">
         <div class="how-heading">Understanding your domain bars</div>
-        <p>Your habits feed into four domains: Sleep, Nutrition, Movement, and Stress &amp; Recovery. The domain bars on the This Week screen fill based on your completions for the week so far, measured against days elapsed rather than all seven days -- so on a Tuesday, you're compared against two days of possible habits, not a full week. A few habits cross domains: the morning walk counts toward both Movement and Sleep, and mobility work counts toward both Movement and Stress.</p>
+        <p>Your habits feed into four domains: Sleep, Nutrition, Training, and Recovery. The domain bars on the This Week screen fill based on your completions for the week so far, measured against days elapsed rather than all seven days -- so on a Tuesday, you're compared against two days of possible habits, not a full week. A few habits cross domains: mobility work counts toward both Training and Recovery.</p>
       </div>
 
       <div class="how-section">
@@ -4780,9 +4705,9 @@ const OB_SCREENS = [
   // Screen 1 — Welcome
   () => `
     <div class="ob-screen">
-      <img src="apple-touch-icon.png" alt="Bloom" class="ob-logo">
-      <h1 class="ob-headline">A wellness tracker that works with postpartum life, not against it.</h1>
-      <p class="ob-body">Built around four domains and daily habits — not calorie counting, not macro tracking.</p>
+      <img src="apple-touch-icon.png" alt="Root" class="ob-logo">
+      <h1 class="ob-headline">Build the body. Protect the heart. Stay consistent.</h1>
+      <p class="ob-body">Root is a body recomposition and cardiovascular health tracker built around daily habits -- not calorie counting, not macro tracking.</p>
       <button class="ob-btn" id="ob-next">Next</button>
     </div>
   `,
@@ -4790,13 +4715,13 @@ const OB_SCREENS = [
   () => `
     <div class="ob-screen">
       <h1 class="ob-headline">Habits, not numbers.</h1>
-      <p class="ob-body">Bloom tracks the behaviors that research shows actually drive postpartum weight loss and wellbeing — sleep, nutrition, movement, and stress recovery. These are the four domains your daily habits feed into.</p>
-      <p class="ob-body">Research consistently shows that behavior-based approaches outperform calorie and macro tracking for long-term results. They're more sustainable, easier to maintain, and better suited to postpartum life where cognitive load is already high.</p>
+      <p class="ob-body">Root tracks the behaviors that research consistently links to body recomposition and cardiovascular health -- sleep, nutrition, training, and recovery. These are the four domains your daily habits feed into.</p>
+      <p class="ob-body">Behavior-based tracking outperforms macro counting for long-term results. It is more sustainable, easier to maintain, and keeps focus on the inputs you can actually control.</p>
       <div class="ob-domains">
         <div class="ob-domain ob-domain-sleep">Sleep</div>
         <div class="ob-domain ob-domain-nutrition">Nutrition</div>
-        <div class="ob-domain ob-domain-movement">Movement</div>
-        <div class="ob-domain ob-domain-stress">Stress &amp; Recovery</div>
+        <div class="ob-domain ob-domain-training">Training</div>
+        <div class="ob-domain ob-domain-recovery">Recovery</div>
       </div>
       <button class="ob-btn" id="ob-next">Next</button>
     </div>
@@ -4847,28 +4772,16 @@ const OB_SCREENS = [
           <input class="form-input" id="ob-goal-high" type="number" placeholder="To"   step="0.5" style="flex:1" value="${s.goalWeightHigh || ''}">
         </div>
       </div>
-      <div class="toggle-row" style="border:none;padding:0;margin-bottom:16px">
-        <div>
-          <div class="toggle-label">Breastfeeding mode</div>
-          <div class="toggle-sublabel">Adjusts guidance and messaging throughout the app to reflect breastfeeding.</div>
-        </div>
-        <label class="toggle" style="flex-shrink:0;margin-left:12px">
-          <input type="checkbox" id="ob-bf" ${s.breastfeeding ? 'checked' : ''}>
-          <div class="toggle-track"></div>
-        </label>
-      </div>
       <button class="ob-btn" id="ob-next">Next</button>
     </div>`;
   },
   // Screen 5 — Done
   () => {
-    const bf = Store.getSettings().breastfeeding;
     return `
       <div class="ob-screen">
-        <img src="apple-touch-icon.png" alt="Bloom" class="ob-logo">
+        <img src="apple-touch-icon.png" alt="Root" class="ob-logo">
         <h1 class="ob-headline">You're all set.</h1>
-        <p class="ob-body">Check in daily, reflect weekly, and let the consistency do the work. Postpartum progress is not linear — the domains are there to show you the full picture, not just the scale.</p>
-        ${bf ? `<p class="ob-body" style="font-style:italic;font-size:13px">Breastfeeding mode is on. Timelines and messages throughout the app reflect what's actually happening in your body, not generic weight loss expectations.</p>` : ''}
+        <p class="ob-body">Check in daily, reflect weekly, and let the consistency do the work. Progress in body recomposition is slow and non-linear -- the domains are there to show you the full picture, not just the scale.</p>
         <button class="ob-btn" id="ob-next">Get started</button>
       </div>
     `;
@@ -4944,12 +4857,10 @@ function obSaveScreen(n) {
     const sw   = parseFloat(document.getElementById('ob-start-weight')?.value);
     const gl   = parseFloat(document.getElementById('ob-goal-low')?.value);
     const gh   = parseFloat(document.getElementById('ob-goal-high')?.value);
-    const bf   = document.getElementById('ob-bf')?.checked;
     if (name)    s.name           = name;
     if (!isNaN(sw)) s.startingWeight = sw;
     if (!isNaN(gl)) s.goalWeightLow  = gl;
     if (!isNaN(gh)) s.goalWeightHigh = gh;
-    s.breastfeeding = bf || false;
     Store.saveSettings(s);
   }
 }
@@ -4986,31 +4897,31 @@ const SheetsSync = {
   // ── Stored state ──────────────────────────────────────────────────────────
 
   getStoredToken() {
-    try { return JSON.parse(localStorage.getItem('bloom_google_token')); } catch { return null; }
+    try { return JSON.parse(localStorage.getItem('root_google_token')); } catch { return null; }
   },
   setStoredToken(t) {
-    if (t) localStorage.setItem('bloom_google_token', JSON.stringify(t));
-    else   localStorage.removeItem('bloom_google_token');
+    if (t) localStorage.setItem('root_google_token', JSON.stringify(t));
+    else   localStorage.removeItem('root_google_token');
   },
-  getSheetId()    { return localStorage.getItem('bloom_sheets_id') || null; },
+  getSheetId()    { return localStorage.getItem('root_sheets_id') || null; },
   setSheetId(id)  {
-    if (id) localStorage.setItem('bloom_sheets_id', id);
-    else    localStorage.removeItem('bloom_sheets_id');
+    if (id) localStorage.setItem('root_sheets_id', id);
+    else    localStorage.removeItem('root_sheets_id');
   },
-  getLastSynced() { return localStorage.getItem('bloom_last_synced') || null; },
+  getLastSynced() { return localStorage.getItem('root_last_synced') || null; },
   setLastSynced(t){
-    if (t) localStorage.setItem('bloom_last_synced', t);
-    else   localStorage.removeItem('bloom_last_synced');
+    if (t) localStorage.setItem('root_last_synced', t);
+    else   localStorage.removeItem('root_last_synced');
   },
-  getAccount()    { return localStorage.getItem('bloom_sync_account') || null; },
+  getAccount()    { return localStorage.getItem('root_sync_account') || null; },
   setAccount(e)   {
-    if (e) localStorage.setItem('bloom_sync_account', e);
-    else   localStorage.removeItem('bloom_sync_account');
+    if (e) localStorage.setItem('root_sync_account', e);
+    else   localStorage.removeItem('root_sync_account');
   },
   getQueue() {
-    try { return JSON.parse(localStorage.getItem('bloom_sync_queue') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('root_sync_queue') || '[]'); } catch { return []; }
   },
-  setQueue(q) { localStorage.setItem('bloom_sync_queue', JSON.stringify(q)); },
+  setQueue(q) { localStorage.setItem('root_sync_queue', JSON.stringify(q)); },
 
   isConnected() { return !!(this.getStoredToken() && this.getSheetId()); },
 
@@ -5066,7 +4977,7 @@ const SheetsSync = {
           try {
             const sheetId = await this._createSpreadsheet();
             this.setSheetId(sheetId);
-            localStorage.removeItem('bloom_google_reauth_needed');
+            localStorage.removeItem('root_google_reauth_needed');
             await this.syncAll();
             showToast('Backup connected. Your data is now syncing to Google Sheets in your Drive.', 'success');
             renderSettings();
@@ -5084,7 +4995,7 @@ const SheetsSync = {
     this.setLastSynced(null);
     this.setAccount(null);
     this.setQueue([]);
-    localStorage.removeItem('bloom_google_reauth_needed');
+    localStorage.removeItem('root_google_reauth_needed');
     renderSettings();
   },
 
@@ -5112,14 +5023,14 @@ const SheetsSync = {
       await this._syncBadgesTab(id);
       this.setLastSynced(new Date().toISOString());
       this.setQueue([]);
-      localStorage.removeItem('bloom_google_reauth_needed');
+      localStorage.removeItem('root_google_reauth_needed');
       // Refresh settings panel if open
       const el = document.querySelector('#screen-settings');
       if (el && el.classList.contains('active')) renderSettings();
     } catch(e) {
       this._queueSync();
       if (e.message === 'Token expired' || (e.status && e.status === 401)) {
-        localStorage.setItem('bloom_google_reauth_needed', '1');
+        localStorage.setItem('root_google_reauth_needed', '1');
       }
     }
   },
@@ -5164,7 +5075,7 @@ const SheetsSync = {
     const last = this.getLastSynced();
     if (!last) return;
     const daysSince = (Date.now() - new Date(last).getTime()) / 86400000;
-    if (daysSince > 7) localStorage.setItem('bloom_google_reauth_needed', '1');
+    if (daysSince > 7) localStorage.setItem('root_google_reauth_needed', '1');
   },
 
   // ── Spreadsheet creation ──────────────────────────────────────────────────
@@ -5172,7 +5083,7 @@ const SheetsSync = {
   async _createSpreadsheet() {
     const resp = await gapi.client.sheets.spreadsheets.create({
       resource: {
-        properties: { title: 'Bloom Data' },
+        properties: { title: 'Root Data' },
         sheets: [
           { properties: { title: 'Weigh-ins'    } },
           { properties: { title: 'Daily Habits' } },
@@ -5213,7 +5124,7 @@ const SheetsSync = {
     const dates = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith('bloom_habits_')) dates.push(k.replace('bloom_habits_', ''));
+      if (k.startsWith('root_habits_')) dates.push(k.replace('root_habits_', ''));
     }
     dates.sort();
     const habitIds = Store.getHabitDefs().map(h => h.id);
@@ -5374,7 +5285,7 @@ function hasLocalData() {
   if (Store.getWorkouts().length > 0) return true;
   if (Store.getSettings().name) return true;
   for (let i = 0; i < localStorage.length; i++) {
-    if (localStorage.key(i).startsWith('bloom_habits_')) return true;
+    if (localStorage.key(i).startsWith('root_habits_')) return true;
   }
   return false;
 }
@@ -5386,7 +5297,7 @@ function showRestorePrompt() {
   overlay.innerHTML = `
     <div style="font-size:48px;margin-bottom:8px">🌸</div>
     <h2 style="font-size:22px;font-weight:600;color:var(--text)">Restore your data?</h2>
-    <p style="color:var(--text-muted);font-size:15px;max-width:300px;line-height:1.5">It looks like your local data was cleared. Your Bloom data is backed up to Google Sheets.</p>
+    <p style="color:var(--text-muted);font-size:15px;max-width:300px;line-height:1.5">It looks like your local data was cleared. Your Root data is backed up to Google Sheets.</p>
     <button id="restore-btn" class="btn btn-primary" style="width:100%;max-width:300px;margin-top:8px">Restore from Google Sheets</button>
     <button id="restore-fresh-btn" class="btn btn-outline" style="width:100%;max-width:300px">Start fresh</button>
   `;
