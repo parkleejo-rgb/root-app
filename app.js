@@ -207,22 +207,22 @@ const Store = {
   saveWorkouts(a)      { this.set('workouts', a); SheetsSync.schedule(); },
 
   getTrainingSelections()    { return this.get('training_selections', {}); },
-  saveTrainingSelections(d)  { this.set('training_selections', d); },
+  saveTrainingSelections(d)  { this.set('training_selections', d); SheetsSync.schedule(); },
 
   getCardioLogs()            { return this.get('cardio_logs', []); },
   saveCardioLogs(a)          { this.set('cardio_logs', a); SheetsSync.schedule(); },
 
   getSleepLogs()       { return this.get('sleep_logs', []); },
-  saveSleepLogs(a)     { this.set('sleep_logs', a); },
+  saveSleepLogs(a)     { this.set('sleep_logs', a); SheetsSync.schedule(); },
 
   getMoodLogs()        { return this.get('mood_logs', []); },
-  saveMoodLogs(a)      { this.set('mood_logs', a); },
+  saveMoodLogs(a)      { this.set('mood_logs', a); SheetsSync.schedule(); },
 
   getProgressPhotos()  { return this.get('progress_photos', []); },
-  saveProgressPhotos(a){ this.set('progress_photos', a); },
+  saveProgressPhotos(a){ this.set('progress_photos', a); SheetsSync.schedule(); },
 
   getMeasurements()    { return this.get('measurements', []); },
-  saveMeasurements(a)  { this.set('measurements', a); },
+  saveMeasurements(a)  { this.set('measurements', a); SheetsSync.schedule(); },
 
   getPoints()          { return this.get('points', { total_earned: 0, spendable: 0, history: [] }); },
   savePoints(p)        { this.set('points', p); SheetsSync.schedule(); },
@@ -234,10 +234,10 @@ const Store = {
   saveBadges(b)        { this.set('badges', b); SheetsSync.schedule(); },
 
   getWeeklyNotes()     { return this.get('weekly_notes', {}); },
-  saveWeeklyNotes(n)   { this.set('weekly_notes', n); },
+  saveWeeklyNotes(n)   { this.set('weekly_notes', n); SheetsSync.schedule(); },
 
   getWeeklyIntentions(){ return this.get('weekly_intentions', {}); },
-  saveWeeklyIntentions(i){ this.set('weekly_intentions', i); },
+  saveWeeklyIntentions(i){ this.set('weekly_intentions', i); SheetsSync.schedule(); },
 
   getHabitDefs() {
     const stored = this.get('habit_defs', null);
@@ -343,8 +343,35 @@ const Store = {
   saveHabitDefs(h)     { this.set('habit_defs', h); },
 
   getActivityDefs()    { return this.get('activity_defs', DEFAULT_ACTIVITIES.map(a => ({...a}))); },
-  saveActivityDefs(a)  { this.set('activity_defs', a); },
+  saveActivityDefs(a)  { this.set('activity_defs', a); SheetsSync.schedule(); },
 };
+
+const SYNC_STATE_KEYS = new Set([
+  'root_google_token',
+  'root_sheets_id',
+  'root_last_synced',
+  'root_sync_account',
+  'root_sync_queue',
+  'root_google_reauth_needed',
+]);
+
+function getAppStateBackup() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('root_') && !SYNC_STATE_KEYS.has(k)) data[k] = localStorage.getItem(k);
+  }
+  return data;
+}
+
+function restoreAppStateBackup(data) {
+  if (!data || typeof data !== 'object') return;
+  Object.entries(data).forEach(([k, v]) => {
+    if (k.startsWith('root_') && !SYNC_STATE_KEYS.has(k) && typeof v === 'string') {
+      localStorage.setItem(k, v);
+    }
+  });
+}
 
 /* ─── Date Utilities ─────────────────────────────────────────────────────── */
 
@@ -400,19 +427,19 @@ function formatWeekRange(ws) {
 /* ─── Points System ──────────────────────────────────────────────────────── */
 
 const Points = {
-  add(amount, reason) {
+  add(amount, reason, date = todayStr()) {
     const p = Store.getPoints();
     p.total_earned += amount;
     p.spendable += amount;
-    p.history.push({ date: todayStr(), amount, reason });
+    p.history.push({ date, amount, reason });
     Store.savePoints(p);
     updatePointsBadge();
   },
-  deduct(amount, reason) {
+  deduct(amount, reason, date = todayStr()) {
     const p = Store.getPoints();
     p.spendable    = Math.max(0, p.spendable    - amount);
     p.total_earned = Math.max(0, p.total_earned - amount);
-    p.history.push({ date: todayStr(), amount: -amount, reason });
+    p.history.push({ date, amount: -amount, reason });
     Store.savePoints(p);
     updatePointsBadge();
   },
@@ -1216,7 +1243,7 @@ function openRetroChecklist(retroDate) {
 
     let listHtml = '';
     // Core habits
-    const coreHabits  = habits.filter(h => CORE_IDS.includes(h.id));
+    const coreHabits  = sortHabitsByPoints(habits.filter(h => CORE_IDS.includes(h.id)));
     const bonusHabits = habits.filter(h => !CORE_IDS.includes(h.id));
 
     if (coreHabits.length) {
@@ -1241,7 +1268,7 @@ function openRetroChecklist(retroDate) {
 
     const pillars = ['sleep','nutrition','training','recovery'];
     pillars.forEach(pillar => {
-      const ph = bonusHabits.filter(h => h.pillar === pillar);
+      const ph = sortHabitsByPoints(bonusHabits.filter(h => h.pillar === pillar));
       if (!ph.length) return;
       const meta = PILLAR_META[pillar];
       listHtml += `<div class="retro-section-label">${meta.label}</div>`;
@@ -1281,13 +1308,13 @@ function openRetroChecklist(retroDate) {
         if (cb.checked && !prevChecked[hid]) {
           // Newly checked — award points
           newChecked[hid] = true;
-          Points.add(pts, `Retro: ${hid} (${retroDate})`);
+          Points.add(pts, `Retro: ${hid} (${retroDate})`, retroDate);
           ptsEarned += pts;
           if (hid === 'train_plan') needsSplitPicker = true;
         } else if (!cb.checked && prevChecked[hid]) {
           // Unchecked retroactively — deduct
           delete newChecked[hid];
-          Points.deduct(pts, `Retro uncheck: ${hid} (${retroDate})`);
+          Points.deduct(pts, `Retro uncheck: ${hid} (${retroDate})`, retroDate);
           if (hid === 'train_plan') {
             const selections = Store.getTrainingSelections();
             delete selections[retroDate];
@@ -2104,24 +2131,9 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
   const coreTagHtml = isCore ? `<p class="habit-detail-core">Core commitment</p>` : '';
   // hasDetail superseded by hasDetailFinal below (after neglect check)
 
-  // Bundle prompt card — always rendered for eligible habits (CSS hides; has-prompt class shows)
+  // Bundle prompt controls stay disabled until the prompt is visible.
   const promptQ         = TBUNDLE_PROMPTS[id];
   const eligiblePrompt  = promptQ && !bundleNote && !bundleSkipped;
-  const promptHtml      = eligiblePrompt ? `
-    <div class="tbundle-prompt">
-      <p class="tbundle-question">${escHtml(promptQ)}</p>
-      <div class="tbundle-input-row">
-        <input class="tbundle-text" type="text" placeholder="Type here…" autocomplete="off" maxlength="120">
-        <button class="tbundle-mic" type="button" title="Voice input">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-      </div>
-      <button class="tbundle-skip-btn" type="button">Skip</button>
-    </div>` : '';
 
   // Neglect indicator
   const isNeglected = (neglectDays || 0) >= 7 && !isChecked;
@@ -2129,6 +2141,8 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
     ? `<p class="habit-detail-neglect">You haven't done this in ${neglectDays} day${neglectDays !== 1 ? 's' : ''}.</p>`
     : '';
   const hasDetailFinal = !!(bundleNote || rationale || isCore || isNeglected);
+  const detailId = `habit-detail-${id}`;
+  const promptDisabled = isPromptActive ? '' : ' disabled tabindex="-1"';
 
   const itemCls = ['habit-item', isChecked ? 'checked' : '', isPromptActive ? 'has-prompt' : '', isNeglected ? 'habit-neglected' : '']
     .filter(Boolean).join(' ');
@@ -2137,16 +2151,32 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
     <div class="${itemCls}" data-habit="${id}" data-opens-workout="${habit.opensWorkout}" data-priority="${habit.priority}">
       <div class="habit-main-row">
         ${coreDot}
-        <div class="habit-check-zone"><div class="habit-check"></div></div>
-        <div class="habit-tap-zone">
+        <button class="habit-check-zone" type="button" role="checkbox" aria-checked="${isChecked ? 'true' : 'false'}" aria-label="${isChecked ? 'Uncheck' : 'Check'} ${escHtml(habit.label)}">
+          <span class="habit-check" aria-hidden="true"></span>
+        </button>
+        <button class="habit-tap-zone" type="button" ${hasDetailFinal ? `aria-expanded="false" aria-controls="${detailId}"` : ''}>
           <div class="habit-text">${escHtml(habit.label)}${extra}</div>
           ${workoutTag}
           <div class="habit-points">${habit.points}pt${habit.points > 1 ? 's' : ''}</div>
           ${hasDetailFinal ? `<svg class="habit-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>` : ''}
-        </div>
+        </button>
       </div>
-      ${hasDetailFinal ? `<div class="habit-detail">${neglectHtml}${noteHtml}${rationaleHtml}${coreTagHtml}</div>` : ''}
-      ${promptHtml}
+      ${hasDetailFinal ? `<div class="habit-detail" id="${detailId}">${neglectHtml}${noteHtml}${rationaleHtml}${coreTagHtml}</div>` : ''}
+      ${eligiblePrompt ? `
+        <div class="tbundle-prompt">
+          <p class="tbundle-question">${escHtml(promptQ)}</p>
+          <div class="tbundle-input-row">
+            <input class="tbundle-text" type="text" placeholder="Type here..." autocomplete="off" maxlength="120"${promptDisabled}>
+            <button class="tbundle-mic" type="button" title="Voice input" aria-label="Voice input"${promptDisabled}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <button class="tbundle-skip-btn" type="button"${promptDisabled}>Skip</button>
+        </div>` : ''}
     </div>`;
 }
 
@@ -2318,7 +2348,7 @@ function renderToday() {
   }
 
   // Top section: all core habits
-  const coreHabits = habits.filter(h => CORE_HABIT_IDS.includes(h.id));
+  const coreHabits = sortHabitsByPoints(habits.filter(h => CORE_HABIT_IDS.includes(h.id)));
   if (coreHabits.length) {
     html += `
       <div class="habit-group">
@@ -2336,7 +2366,7 @@ function renderToday() {
   pillars.forEach(pillar => {
     const meta       = PILLAR_META[pillar];
     const allItems   = habits.filter(h => h.pillar === pillar);
-    const bonusItems = allItems.filter(h => !CORE_HABIT_IDS.includes(h.id));
+    const bonusItems = sortHabitsByPoints(allItems.filter(h => !CORE_HABIT_IDS.includes(h.id)));
     if (!bonusItems.length) return;
 
     const pillarDone = allItems.filter(h => checked[h.id]).length;
@@ -2389,7 +2419,10 @@ function renderToday() {
     // Tap zone: expand/collapse detail panel
     item.querySelector('.habit-tap-zone')?.addEventListener('click', () => {
       const detail = item.querySelector('.habit-detail');
-      if (detail) item.classList.toggle('expanded');
+      if (detail) {
+        const expanded = item.classList.toggle('expanded');
+        item.querySelector('.habit-tap-zone')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      }
     });
 
     // Bundle prompt: skip
@@ -2482,7 +2515,9 @@ function toggleHabit(item) {
     checked[id] = true;
     Store.saveHabits(today, checked);
     item.classList.add('checked');
-    Points.add(habit.points, `Habit: ${habit.label}`);
+    item.querySelector('.habit-check-zone')?.setAttribute('aria-checked', 'true');
+    item.querySelector('.habit-check-zone')?.setAttribute('aria-label', `Uncheck ${habit.label}`);
+    Points.add(habit.points, `Habit: ${habit.label}`, today);
     updatePointsBadge();
     showToast(`+${habit.points} pt${habit.points > 1 ? 's' : ''}`, 'success');
 
@@ -2501,6 +2536,10 @@ function toggleHabit(item) {
     // Reveal bundle prompt if newly eligible
     if (TBundle.shouldPromptNow(id)) {
       item.classList.add('has-prompt');
+      item.querySelectorAll('.tbundle-text, .tbundle-mic, .tbundle-skip-btn').forEach(el => {
+        el.disabled = false;
+        el.removeAttribute('tabindex');
+      });
       setTimeout(() => item.querySelector('.tbundle-text')?.focus(), 200);
     }
 
@@ -2512,7 +2551,9 @@ function toggleHabit(item) {
     delete checked[id];
     Store.saveHabits(today, checked);
     item.classList.remove('checked');
-    Points.deduct(habit.points, `Habit unchecked: ${habit.label}`);
+    item.querySelector('.habit-check-zone')?.setAttribute('aria-checked', 'false');
+    item.querySelector('.habit-check-zone')?.setAttribute('aria-label', `Check ${habit.label}`);
+    Points.deduct(habit.points, `Habit unchecked: ${habit.label}`, today);
     updatePointsBadge();
     Streak.recompute();
     updateStreakDisplay();
@@ -2554,9 +2595,11 @@ function openTrainingPlanPicker(item, date) {
           checked['train_plan'] = true;
           Store.saveHabits(date, checked);
           item.classList.add('checked');
+          item.querySelector('.habit-check-zone')?.setAttribute('aria-checked', 'true');
+          item.querySelector('.habit-check-zone')?.setAttribute('aria-label', 'Uncheck Followed my training plan');
           const habit = Store.getHabitDefs().find(h => h.id === 'train_plan');
           if (habit) {
-            Points.add(habit.points, `Habit: ${habit.label}`);
+            Points.add(habit.points, `Habit: ${habit.label}`, date);
             updatePointsBadge();
             showToast(`+${habit.points} pts`, 'success');
             const newBadges = Badges.check();
@@ -2581,7 +2624,15 @@ function openTrainingPlanPicker(item, date) {
         `;
         body.querySelector('#tplan-log-yes').addEventListener('click', () => {
           closeModal();
-          setTimeout(() => openWorkoutModal('strength'), 200);
+          setTimeout(() => openWorkoutModal({
+            activityId: splitId,
+            activityLabel: `${splitName} training`,
+            priority: true,
+            splitDay: splitId,
+            splitDayName: splitName,
+            date,
+            lockDate: true,
+          }), 200);
         });
         body.querySelector('#tplan-log-skip').addEventListener('click', closeModal);
       });
@@ -2710,6 +2761,8 @@ function renderWeek() {
     `;
   });
   html += `</div>`;
+
+  html += renderTrainingWeekCard(days, today, settings);
 
   // Weigh-in section
   if (!thisWeekWeighIn) {
@@ -2885,6 +2938,10 @@ function getSplitDays(settings) {
                   { id: 'upper',  name: 'Upper' }, { id: 'lower',  name: 'Lower' }],
   };
   return presets[settings.trainingSplit] || [{ id: 'fullbody', name: 'Full body' }];
+}
+
+function sortHabitsByPoints(habits) {
+  return habits.slice().sort((a, b) => (b.points || 0) - (a.points || 0));
 }
 
 function getWeekTrainingSummary(days) {
@@ -3063,11 +3120,23 @@ function renderExercise() {
   const we       = new Date(ws); we.setDate(we.getDate() + 6);
   const weStr    = dateStr(we);
   const weekWorkouts  = workouts.filter(w => w.date >= wsStr && w.date <= weStr);
-  const weekStrength  = weekWorkouts.filter(w => w.priority);
+  const weekPlan      = weekWorkouts.filter(w => w.priority);
   const weekOther     = weekWorkouts.filter(w => !w.priority);
-  const totalSessions = weekWorkouts.length;
+  const planSessions  = weekPlan.length;
   const target        = settings.weeklySessionTarget || 3;
-  const remaining     = Math.max(0, target - totalSessions);
+  const remaining     = Math.max(0, target - planSessions);
+  const splitDays     = getSplitDays(settings);
+  const weekPlanRows  = splitDays.map(sd => {
+    const done = weekPlan.filter(w => w.splitDay === sd.id);
+    return `
+      <div class="training-split-row">
+        <span class="training-split-label">${escHtml(sd.name)}</span>
+        <span class="training-split-status ${done.length ? 'done' : 'pending'}">
+          ${done.length ? `${done.length} logged` : 'not logged'}
+        </span>
+      </div>
+    `;
+  }).join('');
   let html = '';
 
   // Log a Workout -- primary action, first
@@ -3079,8 +3148,8 @@ function renderExercise() {
       <div class="card-title">This Week</div>
       <div class="exercise-week-summary">
         <div class="exercise-week-stat">
-          <span class="exercise-week-num">${weekStrength.length}</span>
-          <span class="exercise-week-label">strength</span>
+          <span class="exercise-week-num">${planSessions}</span>
+          <span class="exercise-week-label">plan</span>
         </div>
         <div class="exercise-week-divider"></div>
         <div class="exercise-week-stat">
@@ -3089,9 +3158,12 @@ function renderExercise() {
         </div>
         <div class="exercise-week-divider"></div>
         <div class="exercise-week-stat">
-          <span class="exercise-week-num">${totalSessions} / ${target}</span>
+          <span class="exercise-week-num">${planSessions} / ${target}</span>
           <span class="exercise-week-label">${remaining === 0 ? 'target hit' : `${remaining} remaining`}</span>
         </div>
+      </div>
+      <div class="training-split-rows" style="margin-top:12px">
+        ${weekPlanRows}
       </div>
     </div>
   `;
@@ -3117,7 +3189,7 @@ function renderExercise() {
     html += `<div class="card">`;
     workouts.forEach(w => {
       const dot = w.priority ? 'priority' : '';
-      const tag = w.priority ? '<span class="priority-tag">Strength</span>' : '';
+      const tag = w.priority ? `<span class="priority-tag">${escHtml(w.splitDayName || 'Plan')}</span>` : '';
       html += `
         <div class="workout-entry" data-workout-id="${w.id}">
           <div class="workout-type-dot ${dot}"></div>
@@ -3140,10 +3212,23 @@ function renderExercise() {
       e.stopPropagation();
       const id = btn.dataset.id;
       if (!confirm('Delete this workout?')) return;
-      const updated = Store.getWorkouts().filter(w => w.id !== id);
+      const allWorkouts = Store.getWorkouts();
+      const removed = allWorkouts.find(w => String(w.id) === id);
+      const updated = allWorkouts.filter(w => String(w.id) !== id);
       Store.saveWorkouts(updated);
+      if (removed?.priority && removed.splitDay) {
+        const stillHasPlanWorkout = updated.some(w => w.date === removed.date && w.priority && w.splitDay);
+        if (!stillHasPlanWorkout) {
+          const selections = Store.getTrainingSelections();
+          if (selections[removed.date]?.splitDay === removed.splitDay) {
+            delete selections[removed.date];
+            Store.saveTrainingSelections(selections);
+          }
+        }
+      }
       Badges.recheckWorkoutBadges();
       renderExercise();
+      if (currentScreen === 'week') renderWeek();
       if (currentScreen === 'progress') renderProgress();
     });
   });
@@ -4006,27 +4091,27 @@ function renderSettings() {
       <div class="settings-group">
         <div class="settings-row">
           <div class="settings-row-label">Name</div>
-          <input class="settings-row-input" id="s-name" type="text" placeholder="Your name" value="${escHtml(s.name || '')}" autocomplete="off">
+          <input class="settings-row-input" id="s-name" type="text" placeholder="Your name" value="${escHtml(s.name || '')}" autocomplete="off" aria-label="Name">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Starting weight</div>
-          <input class="settings-row-input" id="s-start-weight" type="number" step="0.1" placeholder="lbs" value="${s.startingWeight || ''}">
+          <input class="settings-row-input" id="s-start-weight" type="number" step="0.1" placeholder="lbs" value="${s.startingWeight || ''}" aria-label="Starting weight">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Goal weight (low)</div>
-          <input class="settings-row-input" id="s-goal-low" type="number" step="0.1" placeholder="lbs" value="${s.goalWeightLow || ''}">
+          <input class="settings-row-input" id="s-goal-low" type="number" step="0.1" placeholder="lbs" value="${s.goalWeightLow || ''}" aria-label="Goal weight low">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Goal weight (high)</div>
-          <input class="settings-row-input" id="s-goal-high" type="number" step="0.1" placeholder="lbs" value="${s.goalWeightHigh || ''}">
+          <input class="settings-row-input" id="s-goal-high" type="number" step="0.1" placeholder="lbs" value="${s.goalWeightHigh || ''}" aria-label="Goal weight high">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">App start date</div>
-          <input class="settings-row-input" id="s-start-date" type="date" value="${s.appStartDate || todayStr()}">
+          <input class="settings-row-input" id="s-start-date" type="date" value="${s.appStartDate || todayStr()}" aria-label="App start date">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Primary goal</div>
-          <select class="settings-row-input" id="s-primary-goal">
+          <select class="settings-row-input" id="s-primary-goal" aria-label="Primary goal">
             <option value="recomposition" ${(s.primaryGoal || 'recomposition') === 'recomposition' ? 'selected' : ''}>Recomposition</option>
             <option value="build_muscle"  ${s.primaryGoal === 'build_muscle'  ? 'selected' : ''}>Build muscle</option>
             <option value="lose_fat"      ${s.primaryGoal === 'lose_fat'      ? 'selected' : ''}>Lose fat</option>
@@ -4034,7 +4119,7 @@ function renderSettings() {
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Age</div>
-          <input class="settings-row-input" id="s-age" type="number" placeholder="Optional" min="18" max="99" value="${s.age || ''}">
+          <input class="settings-row-input" id="s-age" type="number" placeholder="Optional" min="18" max="99" value="${s.age || ''}" aria-label="Age">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Current goal</div>
@@ -4052,17 +4137,17 @@ function renderSettings() {
         <div class="settings-row" style="align-items:center">
           <div class="settings-row-label">Weekly session target</div>
           <div class="stepper-row" style="display:flex;align-items:center;gap:8px">
-            <button class="stepper-btn" id="s-sessions-minus">−</button>
+            <button class="stepper-btn" id="s-sessions-minus" aria-label="Decrease weekly session target">−</button>
             <span id="s-sessions-val" style="min-width:18px;text-align:center;font-weight:500">${s.weeklySessionTarget || 3}</span>
-            <button class="stepper-btn" id="s-sessions-plus">+</button>
+            <button class="stepper-btn" id="s-sessions-plus" aria-label="Increase weekly session target">+</button>
           </div>
         </div>
         <div class="settings-row" style="align-items:center">
           <div class="settings-row-label">Daily step goal</div>
           <div class="stepper-row" style="display:flex;align-items:center;gap:8px">
-            <button class="stepper-btn" id="s-steps-minus">−</button>
+            <button class="stepper-btn" id="s-steps-minus" aria-label="Decrease daily step goal">−</button>
             <span id="s-steps-val" style="min-width:40px;text-align:center;font-weight:500">${(s.stepGoal || 8000).toLocaleString()}</span>
-            <button class="stepper-btn" id="s-steps-plus">+</button>
+            <button class="stepper-btn" id="s-steps-plus" aria-label="Increase daily step goal">+</button>
           </div>
         </div>
         <div class="settings-btn-row" id="s-edit-training-plan">
@@ -4087,19 +4172,19 @@ function renderSettings() {
       <div class="settings-group">
         <div class="settings-row">
           <div class="settings-row-label">Usual wake time</div>
-          <input class="settings-row-input" id="s-wake" type="time" value="${s.usualWakeTime || '07:00'}">
+          <input class="settings-row-input" id="s-wake" type="time" value="${s.usualWakeTime || '07:00'}" aria-label="Usual wake time">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Bedtime target</div>
-          <input class="settings-row-input" id="s-bedtime" type="time" value="${s.bedtimeTarget || '22:30'}">
+          <input class="settings-row-input" id="s-bedtime" type="time" value="${s.bedtimeTarget || '22:30'}" aria-label="Bedtime target">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Eating cutoff</div>
-          <input class="settings-row-input" id="s-eat-cutoff" type="time" value="${s.eatCutoff || '19:00'}">
+          <input class="settings-row-input" id="s-eat-cutoff" type="time" value="${s.eatCutoff || '19:00'}" aria-label="Eating cutoff">
         </div>
         <div class="settings-row">
           <div class="settings-row-label">Caffeine cutoff</div>
-          <input class="settings-row-input" id="s-caffeine-cutoff" type="time" value="${s.caffeineCutoff || '13:00'}">
+          <input class="settings-row-input" id="s-caffeine-cutoff" type="time" value="${s.caffeineCutoff || '13:00'}" aria-label="Caffeine cutoff">
         </div>
       </div>
     </div>
@@ -4422,14 +4507,43 @@ function renderSettings() {
 /* ─── Modal System ───────────────────────────────────────────────────────── */
 
 let modalStack = [];
+let lastModalFocus = null;
+
+function getFocusable(container) {
+  return Array.from(container.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'))
+    .filter(el => !el.disabled && el.offsetParent !== null);
+}
+
+function setShellAriaHidden(hidden) {
+  ['app-header', 'main-content', 'bottom-nav'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (hidden) el.setAttribute('aria-hidden', 'true');
+    else el.removeAttribute('aria-hidden');
+  });
+}
 
 function openModal(renderFn) {
   const overlay = document.getElementById('modal-overlay');
   const body    = document.getElementById('modal-body');
+  lastModalFocus = document.activeElement;
   overlay.classList.remove('hidden');
+  overlay.removeAttribute('aria-hidden');
   body.innerHTML = '';
   renderFn(body);
+  const title = body.querySelector('.modal-title');
+  if (title) {
+    title.id = title.id || 'modal-title';
+    overlay.setAttribute('aria-labelledby', title.id);
+  } else {
+    overlay.removeAttribute('aria-labelledby');
+  }
+  setShellAriaHidden(true);
   modalStack.push(renderFn);
+  requestAnimationFrame(() => {
+    const focusable = getFocusable(body);
+    (focusable[0] || document.getElementById('modal-sheet'))?.focus();
+  });
 
   // Close on backdrop click
   document.getElementById('modal-backdrop').onclick = closeModal;
@@ -4438,17 +4552,25 @@ function openModal(renderFn) {
 function closeModal() {
   const overlay = document.getElementById('modal-overlay');
   overlay.classList.add('hidden');
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.removeAttribute('aria-labelledby');
   document.getElementById('modal-body').innerHTML = '';
   modalStack = [];
+  setShellAriaHidden(false);
+  if (lastModalFocus && document.contains(lastModalFocus)) lastModalFocus.focus();
+  lastModalFocus = null;
 }
 
 /* ── Workout Modal ── */
 
-let workoutDraft = { activityId: null, activityLabel: null, priority: false, duration: 30, intensity: 'Moderate', note: '' };
+let workoutDraft = { activityId: null, activityLabel: null, priority: false, splitDay: null, splitDayName: null, duration: 30, intensity: 'Moderate', note: '', lockDate: false };
 
 function openWorkoutModal(presetActivity) {
-  workoutDraft = { activityId: presetActivity, activityLabel: null, priority: false, duration: 30, intensity: 'Moderate', note: '', date: todayStr() };
-  if (presetActivity === 'strength') {
+  workoutDraft = { activityId: null, activityLabel: null, priority: false, splitDay: null, splitDayName: null, duration: 30, intensity: 'Moderate', note: '', date: todayStr(), lockDate: false };
+  if (presetActivity && typeof presetActivity === 'object') {
+    workoutDraft = { ...workoutDraft, ...presetActivity };
+    openModal(renderWorkoutStep2);
+  } else if (presetActivity === 'strength') {
     workoutDraft.activityId = 'strength';
     workoutDraft.activityLabel = 'Strength training';
     workoutDraft.priority = true;
@@ -4460,11 +4582,23 @@ function openWorkoutModal(presetActivity) {
 
 function renderWorkoutStep1(body) {
   const activities = Store.getActivityDefs();
+  const otherActivities = activities.filter(a => a.id !== 'strength');
+  const splitDays = getSplitDays(Store.getSettings());
   body.innerHTML = `
     <div class="modal-title">Log a Workout</div>
-    <div class="step-label">What type of workout?</div>
+    <div class="step-label">Training plan</div>
+    <div class="activity-grid mb-16">
+      ${splitDays.map(d => `
+        <button class="activity-btn priority-activity training-plan-activity"
+          data-id="${escHtml(d.id)}" data-label="${escHtml(d.name)} training" data-priority="true"
+          data-split-id="${escHtml(d.id)}" data-split-name="${escHtml(d.name)}">
+          ${escHtml(d.name)}
+        </button>
+      `).join('')}
+    </div>
+    <div class="step-label">Other workout</div>
     <div class="activity-grid">
-      ${activities.map(a => `
+      ${otherActivities.map(a => `
         <button class="activity-btn ${a.priority ? 'priority-activity' : ''} ${workoutDraft.activityId === a.id ? 'selected' : ''}"
           data-id="${a.id}" data-label="${escHtml(a.label)}" data-priority="${a.priority}">
           ${a.priority ? '⭐ ' : ''}${escHtml(a.label)}
@@ -4482,6 +4616,8 @@ function renderWorkoutStep1(body) {
       workoutDraft.activityId    = btn.dataset.id;
       workoutDraft.activityLabel = btn.dataset.label;
       workoutDraft.priority      = btn.dataset.priority === 'true';
+      workoutDraft.splitDay      = btn.dataset.splitId || null;
+      workoutDraft.splitDayName  = btn.dataset.splitName || null;
       openModal(renderWorkoutStep2);
     });
   });
@@ -4513,6 +4649,8 @@ function openWorkoutOtherStep(body) {
     if (exists) {
       actId = exists.id;
       workoutDraft.priority = exists.priority;
+      workoutDraft.splitDay = exists.splitDay || null;
+      workoutDraft.splitDayName = exists.splitDayName || null;
     } else {
       actId = 'custom_' + Date.now();
       activities.push({ id: actId, label, priority: false, custom: true });
@@ -4540,8 +4678,9 @@ function renderWorkoutStep2(body) {
     </div>
     <div class="step-label">Note (optional)</div>
     <input type="text" class="form-input mb-16" id="workout-note" placeholder="Any notes…" maxlength="100" value="${escHtml(workoutDraft.note)}">
-    <div class="step-label">Date</div>
-    <input type="date" class="form-input mb-16" id="workout-date" value="${workoutDraft.date}" max="${todayStr()}">
+    ${workoutDraft.lockDate
+      ? `<div class="step-label">Date</div><div class="settings-note mb-16">${formatDateShort(workoutDraft.date)}</div>`
+      : `<div class="step-label">Date</div><input type="date" class="form-input mb-16" id="workout-date" value="${workoutDraft.date}" max="${todayStr()}">`}
     <button class="btn btn-primary btn-full" id="save-workout-btn">Save Workout</button>
   `;
 
@@ -4564,7 +4703,7 @@ function renderWorkoutStep2(body) {
     workoutDraft.note = e.target.value;
   });
 
-  body.querySelector('#workout-date').addEventListener('change', e => {
+  body.querySelector('#workout-date')?.addEventListener('change', e => {
     workoutDraft.date = e.target.value || todayStr();
   });
 
@@ -4580,6 +4719,8 @@ function saveWorkout() {
     activityId: workoutDraft.activityId,
     activityLabel: workoutDraft.activityLabel || 'Workout',
     priority: workoutDraft.priority,
+    splitDay: workoutDraft.splitDay,
+    splitDayName: workoutDraft.splitDayName,
     duration: workoutDraft.duration,
     intensity: workoutDraft.intensity,
     note: note.trim(),
@@ -4590,19 +4731,31 @@ function saveWorkout() {
   Store.saveWorkouts(workouts);
 
   const pts = workout.priority ? 2 : 1;
-  Points.add(pts, `Workout: ${workout.activityLabel}`);
-
-  closeModal();
-  showToast(`Workout logged! +${pts} pt${pts > 1 ? 's' : ''}`, 'success');
+  Points.add(pts, `Workout: ${workout.activityLabel}`, workoutDate);
 
   // Update habit for the workout date
   const habitKey = workout.priority ? 'train_plan' : 'train_cardio';
   const hChecked = Store.getHabits(workoutDate);
+  let habitPts = 0;
   if (!hChecked[habitKey]) {
     hChecked[habitKey] = true;
     Store.saveHabits(workoutDate, hChecked);
+    const habit = Store.getHabitDefs().find(h => h.id === habitKey);
+    if (habit) {
+      habitPts = habit.points;
+      Points.add(habit.points, `Habit: ${habit.label}`, workoutDate);
+    }
     if (workoutDate === todayStr() && currentScreen === 'today') renderToday();
   }
+  if (workout.priority && workout.splitDay) {
+    const selections = Store.getTrainingSelections();
+    selections[workoutDate] = { splitDay: workout.splitDay, splitDayName: workout.splitDayName || workout.activityLabel };
+    Store.saveTrainingSelections(selections);
+  }
+
+  const totalPts = pts + habitPts;
+  closeModal();
+  showToast(`Workout logged! +${totalPts} pt${totalPts > 1 ? 's' : ''}`, 'success');
 
   const newBadges = Badges.check();
   if (newBadges.length) setTimeout(() => Badges.showCelebration(newBadges), 300);
@@ -4668,11 +4821,11 @@ function openWeighInModal() {
     body.innerHTML = `
       <div class="modal-title">Log Weigh-In</div>
       <div class="form-group">
-        <label class="form-label">Weight (lbs)</label>
+        <label class="form-label" for="weighin-input">Weight (lbs)</label>
         <input class="form-input" id="weighin-input" type="number" step="0.1" placeholder="${last || 'e.g. 162.5'}" inputmode="decimal">
       </div>
       <div class="form-group">
-        <label class="form-label">Date</label>
+        <label class="form-label" for="weighin-date">Date</label>
         <input class="form-input" id="weighin-date" type="date" value="${todayStr()}">
       </div>
       <button class="btn btn-primary btn-full" id="save-weighin-btn">Log Weight</button>
@@ -4694,7 +4847,7 @@ function openWeighInModal() {
       weighIns.sort((a,b) => a.date.localeCompare(b.date));
       Store.saveWeighIns(weighIns);
 
-      Points.add(3, 'Weekly weigh-in');
+      Points.add(3, 'Weekly weigh-in', date);
       closeModal();
       showToast('Weight logged! +3 pts', 'success');
 
@@ -4722,11 +4875,12 @@ function _goalScreen1(body) {
   body.innerHTML = `
     <div class="modal-title">What are you working toward?</div>
     <div class="form-group">
+      <label class="form-label" for="goal-name">Goal name</label>
       <input class="form-input" id="goal-name" type="text" placeholder="e.g. Rouje dress"
              value="${escHtml(goals.name || '')}" maxlength="60" autocomplete="off">
     </div>
     <div class="form-group">
-      <label class="form-label">What does it cost? <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <label class="form-label" for="goal-amount">What does it cost? <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
       <input class="form-input" id="goal-amount" type="number" step="1" min="0"
              placeholder="Dollar amount" value="${goals.amount || ''}">
     </div>
@@ -4923,11 +5077,11 @@ function openManualPointsModal() {
       <div class="modal-title">Manual Point Adjustment</div>
       <p class="text-muted text-small mb-16">Current balance: <strong>${pts.spendable} pts</strong> (${pts.total_earned} total earned)</p>
       <div class="form-group">
-        <label class="form-label">Adjustment amount (+ to add, - to deduct)</label>
+        <label class="form-label" for="adj-amount">Adjustment amount (+ to add, - to deduct)</label>
         <input class="form-input" id="adj-amount" type="number" step="1" placeholder="e.g. 10 or -5">
       </div>
       <div class="form-group">
-        <label class="form-label">Reason</label>
+        <label class="form-label" for="adj-reason">Reason</label>
         <input class="form-input" id="adj-reason" type="text" placeholder="e.g. Correction for missed check-in" maxlength="80">
       </div>
       <button class="btn btn-primary btn-full" id="confirm-adj-btn">Apply Adjustment</button>
@@ -5119,11 +5273,11 @@ function renderHabitsCustomizerBody(body) {
         b.innerHTML = `
           <div class="modal-title">Add Habit</div>
           <div class="form-group">
-            <label class="form-label">Habit name</label>
+            <label class="form-label" for="new-habit-label">Habit name</label>
             <input class="form-input" id="new-habit-label" type="text" placeholder="e.g. Took vitamins" maxlength="60" autocomplete="off">
           </div>
           <div class="form-group">
-            <label class="form-label">Domain</label>
+            <label class="form-label" for="new-habit-pillar">Domain</label>
             <select class="form-input form-select" id="new-habit-pillar">
               ${['sleep','nutrition','training','recovery'].map(p =>
                 `<option value="${p}" ${p === pillar ? 'selected' : ''}>${PILLAR_META[p].label}</option>`
@@ -5131,7 +5285,7 @@ function renderHabitsCustomizerBody(body) {
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Also contributes to <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+            <label class="form-label" for="new-habit-also">Also contributes to <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
             <select class="form-input form-select" id="new-habit-also">
               <option value="">— None —</option>
               ${['sleep','nutrition','training','recovery'].filter(p => p !== pillar).map(p =>
@@ -5140,7 +5294,7 @@ function renderHabitsCustomizerBody(body) {
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Points</label>
+            <label class="form-label" for="new-habit-pts">Points</label>
             <select class="form-input form-select" id="new-habit-pts">
               <option value="1">1 point</option>
               <option value="2">2 points</option>
@@ -5211,11 +5365,12 @@ function openProteinTargetModal(onSave) {
           `).join('')}
         </div>
         <div id="pm-weight-group" style="display:${method !== 'manual' ? 'block' : 'none'}">
+          <label class="form-label" for="pm-weight">Weight (lbs)</label>
           <input class="form-input" id="pm-weight" type="number" placeholder="Weight (lbs)" step="1" min="50" value="${method !== 'manual' ? (s.startingWeight || '') : ''}">
           <p id="pm-preview" class="text-small" style="margin-top:8px;color:var(--sage-dark);display:${curG ? 'block' : 'none'}">${curG ? 'Current target: ' + curG + 'g' : ''}</p>
         </div>
         <div id="pm-manual-group" style="display:${method === 'manual' ? 'block' : 'none'}">
-          <label class="form-label">Daily protein target (g)</label>
+          <label class="form-label" for="pm-manual">Daily protein target (g)</label>
           <input class="form-input" id="pm-manual" type="number" placeholder="e.g. 160" step="5" min="50" value="${curG || ''}">
         </div>
         <button class="btn btn-primary btn-full mt-16" id="pm-save">Save</button>
@@ -5470,6 +5625,12 @@ function importData() {
           `This will replace all current data with the backup (${keys.length} items). This cannot be undone.`,
           'Import',
           () => {
+            const existingKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k.startsWith('root_')) existingKeys.push(k);
+            }
+            existingKeys.forEach(k => localStorage.removeItem(k));
             keys.forEach(k => localStorage.setItem(k, data[k]));
             showToast('Data imported. Reloading…', 'success');
             setTimeout(() => window.location.reload(), 1200);
@@ -5525,7 +5686,36 @@ function escHtml(s) {
 /* ─── Keyboard / Accessibility ───────────────────────────────────────────── */
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  const overlay = document.getElementById('modal-overlay');
+  const modalOpen = overlay && !overlay.classList.contains('hidden');
+  const onboarding = document.getElementById('onboarding');
+  if (e.key === 'Escape' && modalOpen) closeModal();
+  if (e.key === 'Tab' && modalOpen) {
+    const focusable = getFocusable(overlay);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+  if (e.key === 'Tab' && onboarding) {
+    const focusable = getFocusable(onboarding);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 });
 
 /* ─── First-visit Hints ──────────────────────────────────────────────────── */
@@ -5592,7 +5782,7 @@ function openHowRootWorks() {
 
       <div class="how-section">
         <div class="how-heading">Logging exercise</div>
-        <p>On the Exercise screen, tap "Log a workout" and choose an activity, duration, and intensity. Checking the strength training habit on Today will prompt the workout log automatically. Strength sessions are marked as priority. The Extra cardio session habit is for dedicated cardio done outside your regular training plan -- a run, bike ride, or conditioning session on a rest day. If cardio is part of your training plan for the day, log it through the training habit instead. The Exercise screen shows your weekly totals and full workout history.</p>
+        <p>On the Exercise screen, tap "Log a workout" and choose the training-plan session you completed -- Push, Pull, Legs, or whatever split you configured -- then add duration and intensity. Checking the training-plan habit on Today will ask which session you did and can log that workout immediately. Extra cardio is for dedicated cardio outside your regular training plan. The Exercise screen shows your plan sessions, other workouts, weekly target, and full workout history.</p>
       </div>
 
       <div class="how-section">
@@ -5627,15 +5817,20 @@ function openOnboarding() {
 
   const el = document.createElement('div');
   el.id = 'onboarding';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'onboarding-title');
   el.innerHTML = `
     <button id="ob-skip">Skip</button>
     <div id="ob-screens"></div>
     <div id="ob-dots"></div>
   `;
   document.getElementById('app').appendChild(el);
+  setShellAriaHidden(true);
 
   document.getElementById('ob-skip').addEventListener('click', closeOnboarding);
   renderObScreen(0);
+  requestAnimationFrame(() => document.getElementById('ob-next')?.focus());
 }
 
 const OB_SCREENS = [
@@ -5643,7 +5838,7 @@ const OB_SCREENS = [
   () => `
     <div class="ob-screen">
       <img src="apple-touch-icon.png" alt="Root" class="ob-logo">
-      <h1 class="ob-headline">Build the body. Protect the heart. Stay consistent.</h1>
+      <h1 class="ob-headline" id="onboarding-title">Build the body. Protect the heart. Stay consistent.</h1>
       <p class="ob-body">Root is a body recomposition and cardiovascular health tracker built around daily habits -- not calorie counting, not macro tracking.</p>
       <button class="ob-btn" id="ob-next">Next</button>
     </div>
@@ -5745,6 +5940,7 @@ const OB_SCREENS = [
       </div>
 
       <div id="ob-protein-weight-group" class="form-group" style="width:100%;text-align:left;margin-top:12px">
+        <label class="sr-only" for="ob-protein-weight">Weight in pounds</label>
         <input class="form-input" id="ob-protein-weight" type="number" placeholder="Weight (lbs)" step="1" min="50" value="${s.startingWeight || ''}">
         <p id="ob-protein-preview" class="ob-note" style="margin-top:8px;color:var(--sage-dark);display:${s.proteinTargetG ? 'block' : 'none'}">
           Your daily protein target: ${s.proteinTargetG ? s.proteinTargetG + 'g' : ''} -- this is a starting point you can adjust in Settings.
@@ -5752,7 +5948,7 @@ const OB_SCREENS = [
       </div>
 
       <div id="ob-protein-manual-group" class="form-group" style="width:100%;text-align:left;margin-top:12px;display:none">
-        <label class="form-label">Daily protein target (g)</label>
+        <label class="form-label" for="ob-protein-manual">Daily protein target (g)</label>
         <input class="form-input" id="ob-protein-manual" type="number" placeholder="e.g. 160" step="5" min="50" value="${s.proteinTargetG || ''}">
       </div>
 
@@ -5776,9 +5972,11 @@ const OB_SCREENS = [
         <button class="ob-chip" data-label="">Something else</button>
       </div>
       <div class="form-group">
+        <label class="sr-only" for="ob-goal-name">Goal name</label>
         <input class="form-input" id="ob-goal-name" type="text" placeholder="Name your goal" maxlength="60" autocomplete="off" value="${escHtml(g.name || '')}">
       </div>
       <div class="form-group">
+        <label class="sr-only" for="ob-goal-amount">Goal cost</label>
         <input class="form-input" id="ob-goal-amount" type="number" placeholder="How much does it cost? ($)" step="1" min="0" value="${g.amount || ''}">
       </div>
       <p class="ob-note">You can change this anytime in Settings.</p>
@@ -5793,18 +5991,20 @@ const OB_SCREENS = [
       <h1 class="ob-headline">A few things to get you started.</h1>
       <p class="ob-body">You can update all of these anytime in Settings.</p>
       <div class="form-group">
+        <label class="sr-only" for="ob-name">Name</label>
         <input class="form-input" id="ob-name" type="text" placeholder="What should we call you?" maxlength="40" autocomplete="off" value="${escHtml(s.name || '')}">
       </div>
       <div class="form-group">
+        <label class="sr-only" for="ob-start-weight">Starting weight in pounds</label>
         <input class="form-input" id="ob-start-weight" type="number" placeholder="Starting weight (lbs)" step="0.1" min="50" value="${s.startingWeight || ''}">
         <p class="ob-note" style="margin-top:8px">Used to track your progress over time.</p>
       </div>
       <div class="form-group">
-        <label class="form-label">Goal weight range (lbs)</label>
+        <label class="form-label" id="ob-goal-range-label">Goal weight range (lbs)</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input class="form-input" id="ob-goal-low"  type="number" placeholder="From" step="0.5" style="flex:1" value="${s.goalWeightLow || ''}">
+          <input class="form-input" id="ob-goal-low"  type="number" placeholder="From" step="0.5" style="flex:1" value="${s.goalWeightLow || ''}" aria-label="Goal weight range from">
           <span style="color:var(--text-muted);flex-shrink:0">to</span>
-          <input class="form-input" id="ob-goal-high" type="number" placeholder="To"   step="0.5" style="flex:1" value="${s.goalWeightHigh || ''}">
+          <input class="form-input" id="ob-goal-high" type="number" placeholder="To"   step="0.5" style="flex:1" value="${s.goalWeightHigh || ''}" aria-label="Goal weight range to">
         </div>
       </div>
       <div class="form-group">
@@ -5823,6 +6023,7 @@ const OB_SCREENS = [
         </div>
       </div>
       <div class="form-group">
+        <label class="sr-only" for="ob-age">Age</label>
         <input class="form-input" id="ob-age" type="number" placeholder="Age (optional)" min="18" max="99" value="${s.age || ''}">
         <p class="ob-note" style="margin-top:6px">Used to contextualize some cardiovascular habits.</p>
       </div>
@@ -5851,6 +6052,8 @@ function renderObScreen(n) {
   if (!container) return;
 
   container.innerHTML = OB_SCREENS[n]();
+  const headline = container.querySelector('.ob-headline');
+  if (headline) headline.id = 'onboarding-title';
   container.style.opacity = '0';
   requestAnimationFrame(() => { container.style.transition = 'opacity 0.25s'; container.style.opacity = '1'; });
 
@@ -6094,7 +6297,11 @@ function closeOnboarding() {
   if (el) {
     el.style.opacity = '0';
     el.style.transition = 'opacity 0.3s';
-    setTimeout(() => { el.remove(); showHintIfNeeded(currentScreen); }, 300);
+    setTimeout(() => {
+      el.remove();
+      setShellAriaHidden(false);
+      showHintIfNeeded(currentScreen);
+    }, 300);
   }
 }
 
@@ -6352,9 +6559,18 @@ const SheetsSync = {
   },
 
   async _syncWorkoutsTab(id) {
-    const rows = [['Date', 'Activity', 'Duration (min)', 'Intensity', 'Notes']];
+    const rows = [['Date', 'Activity', 'Duration (min)', 'Intensity', 'Notes', 'Priority', 'Split Day', 'Split Day Name']];
     Store.getWorkouts().slice().sort((a,b) => a.date.localeCompare(b.date))
-      .forEach(w => rows.push([w.date, w.activity || '', w.duration || '', w.intensity || '', w.notes || '']));
+      .forEach(w => rows.push([
+        w.date,
+        w.activityLabel || w.activity || '',
+        w.duration || '',
+        w.intensity || '',
+        w.note || w.notes || '',
+        w.priority ? 'TRUE' : 'FALSE',
+        w.splitDay || '',
+        w.splitDayName || '',
+      ]));
     await this._writeTab(id, 'Workouts', rows);
   },
 
@@ -6387,6 +6603,11 @@ const SheetsSync = {
     rows.push(['_points_json',  JSON.stringify(Store.getPoints())]);
     rows.push(['_goals_json',   JSON.stringify(Store.getGoals())]);
     rows.push(['_habitdefs_json', JSON.stringify(Store.getHabitDefs())]);
+    const appStateJson = JSON.stringify(getAppStateBackup());
+    const chunkSize = 40000;
+    for (let i = 0; i < appStateJson.length; i += chunkSize) {
+      rows.push([`_appstate_json_${String(i / chunkSize).padStart(3, '0')}`, appStateJson.slice(i, i + chunkSize)]);
+    }
     await this._writeTab(id, 'Settings', rows);
   },
 
@@ -6435,6 +6656,12 @@ const SheetsSync = {
       Store.saveSettings(s);
 
       // Restore complex state from JSON blobs
+      const appStateJson = Object.keys(settingsMap)
+        .filter(k => k.startsWith('_appstate_json_'))
+        .sort()
+        .map(k => settingsMap[k])
+        .join('');
+      if (appStateJson) { try { restoreAppStateBackup(JSON.parse(appStateJson)); } catch {} }
       if (settingsMap['_points_json'])    { try { Store.savePoints(JSON.parse(settingsMap['_points_json'])); } catch {} }
       if (settingsMap['_goals_json'])     { try { Store.saveGoals(JSON.parse(settingsMap['_goals_json'])); } catch {} }
       if (settingsMap['_habitdefs_json']) { try { Store.set('habit_defs', JSON.parse(settingsMap['_habitdefs_json'])); } catch {} }
@@ -6460,10 +6687,17 @@ const SheetsSync = {
       }
 
       // Workouts
-      const woResp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: id, range: 'Workouts!A:E' });
+      const woResp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: id, range: 'Workouts!A:H' });
       const workouts = (woResp.result.values || []).slice(1).filter(r => r[0]).map((r, i) => ({
-        id: i + 1, date: r[0], activity: r[1] || '', duration: r[2] ? parseInt(r[2]) : null,
-        intensity: r[3] || '', notes: r[4] || ''
+        id: i + 1,
+        date: r[0],
+        activityLabel: r[1] || '',
+        duration: r[2] ? parseInt(r[2]) : null,
+        intensity: r[3] || '',
+        note: r[4] || '',
+        priority: r[5] === 'TRUE',
+        splitDay: r[6] || null,
+        splitDayName: r[7] || null,
       }));
       Store.saveWorkouts(workouts);
 

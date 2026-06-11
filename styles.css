@@ -277,6 +277,18 @@
 /* ─── Reset & Base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 html { height: 100%; -webkit-tap-highlight-color: transparent; }
 
 body {
@@ -1595,6 +1607,10 @@ textarea.form-input {
   cursor: pointer;
   padding: 2px;
   margin: -2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  border-radius: 8px;
 }
 .habit-tap-zone {
   flex: 1;
@@ -1603,6 +1619,21 @@ textarea.form-input {
   gap: 8px;
   cursor: pointer;
   min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border-radius: 8px;
+  padding: 0;
+}
+.habit-check-zone:focus-visible,
+.habit-tap-zone:focus-visible,
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.nav-btn:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
 }
 .habit-text {
   /* override old flex:1 since tap-zone is now the flex container */
