@@ -4534,16 +4534,16 @@ function renderSettings() {
     screen.querySelector('#' + elId)?.addEventListener('change', async e => {
       const s2 = Store.getSettings();
 
-      // Request OS permission on first enable
-      if (e.target.checked && Notification.permission !== 'granted') {
-        const perm = await Notifications.requestPermission();
-        if (perm !== 'granted') { e.target.checked = false; renderSettings(); return; }
-      }
-
+      // Save the preference immediately — don't gate saving on OS permission
       s2[key] = e.target.checked;
       Store.saveSettings(s2);
 
-      // Sync with push worker
+      // Request OS permission when enabling (best-effort — don't revert toggle on denial)
+      if (e.target.checked) {
+        await Notifications.requestPermission().catch(() => {});
+      }
+
+      // Sync with push worker (only active once VAPID_PUBLIC_KEY + PUSH_WORKER_URL are set)
       if (Push.isConfigured() && Push.isSupported()) {
         const anyEnabled = s2.notifStreakProtection || s2.notifWeighIn ||
                            s2.notifBedtime || s2.notifMorningCheckin;

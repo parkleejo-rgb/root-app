@@ -17,3 +17,6 @@ preview_id = "REPLACE_WITH_KV_NAMESPACE_PREVIEW_ID"
 # VAPID keys — set as secrets, never commit them.
 # Run: wrangler secret put VAPID_PRIVATE_JWK   (paste the JSON string)
 # The public key goes in app.js as VAPID_PUBLIC_KEY (safe to commit).
+
+[vars]
+VAPID_PUBLIC_KEY = "BDZJm6bJnXZjFnesY2wLE4kVXbericjU_Cnua-QWitRxfbMZRzIWqbMR5em6YndVv0js2DKCRBwDwRQEnP9CvRI"
