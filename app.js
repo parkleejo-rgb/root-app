@@ -138,8 +138,8 @@ const GOOGLE_CLIENT_ID = '763862383625-3gpodcsd248v47k5f35oh2ptobendksu.apps.goo
 // ─── Web Push config ──────────────────────────────────────────────────────────
 // After running `node worker/generate-keys.mjs`, paste the public key here.
 // The worker URL is your Cloudflare Workers deployment URL.
-const VAPID_PUBLIC_KEY  = ''; // e.g. 'BFb3...Xk='  — base64url uncompressed P-256 key
-const PUSH_WORKER_URL   = ''; // e.g. 'https://root-push.YOUR_SUBDOMAIN.workers.dev'
+const VAPID_PUBLIC_KEY  = 'BDZJm6bJnXZjFnesY2wLE4kVXbericjU_Cnua-QWitRxfbMZRzIWqbMR5em6YndVv0js2DKCRBwDwRQEnP9CvRI'; // e.g. 'BFb3...Xk='  — base64url uncompressed P-256 key
+const PUSH_WORKER_URL   = 'https://root-push.jopark-root.workers.dev'; // e.g. 'https://root-push.YOUR_SUBDOMAIN.workers.dev'
 
 const DEFAULT_SETTINGS = {
   name: '',
