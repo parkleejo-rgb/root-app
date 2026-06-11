@@ -2762,7 +2762,6 @@ function renderWeek() {
   });
   html += `</div>`;
 
-  html += renderTrainingWeekCard(days, today, settings);
 
   // Weigh-in section
   if (!thisWeekWeighIn) {
@@ -3111,62 +3110,95 @@ function getPillarFeedback(pillar, pct) {
 
 /* ─── EXERCISE Screen ────────────────────────────────────────────────────── */
 
-function renderExercise() {
-  const screen   = document.getElementById('screen-exercise');
-  const settings = Store.getSettings();
-  const workouts = Store.getWorkouts().slice().reverse();
-  const ws       = getWeekStart();
-  const wsStr    = dateStr(ws);
-  const we       = new Date(ws); we.setDate(we.getDate() + 6);
-  const weStr    = dateStr(we);
-  const weekWorkouts  = workouts.filter(w => w.date >= wsStr && w.date <= weStr);
-  const weekPlan      = weekWorkouts.filter(w => w.priority);
-  const weekOther     = weekWorkouts.filter(w => !w.priority);
-  const planSessions  = weekPlan.length;
-  const target        = settings.weeklySessionTarget || 3;
-  const remaining     = Math.max(0, target - planSessions);
-  const splitDays     = getSplitDays(settings);
-  const weekPlanRows  = splitDays.map(sd => {
-    const done = weekPlan.filter(w => w.splitDay === sd.id);
+function renderExerciseThisWeek() {
+  const settings   = Store.getSettings();
+  const workouts   = Store.getWorkouts();
+  const ws         = getWeekStart();
+  const wsStr      = dateStr(ws);
+  const we         = new Date(ws); we.setDate(we.getDate() + 6);
+  const weStr      = dateStr(we);
+  const target     = settings.weeklySessionTarget || 3;
+  const splitDays  = getSplitDays(settings);
+  const weekWorkouts = workouts
+    .filter(w => w.date >= wsStr && w.date <= weStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const planSessions  = weekWorkouts.filter(w => w.priority);
+  const remaining     = Math.max(0, target - planSessions.length);
+  const targetHit     = planSessions.length >= target;
+
+  const coverageMap = {};
+  splitDays.forEach(sd => { coverageMap[sd.id] = []; });
+  planSessions.forEach(w => {
+    const id = w.splitDay || w.splitDayId || null;
+    if (id && coverageMap[id] !== undefined) {
+      coverageMap[id].push(w);
+    } else {
+      const match = splitDays.find(sd =>
+        sd.name.toLowerCase() === (w.splitDayName || '').toLowerCase()
+      );
+      if (match) coverageMap[match.id].push(w);
+    }
+  });
+
+  const chips = splitDays.map(sd => {
+    const sessions = coverageMap[sd.id] || [];
+    const count    = sessions.length;
+    const done     = count > 0;
+    const countBadge = count > 1 ? `<span class="split-chip-count">×${count}</span>` : '';
     return `
-      <div class="training-split-row">
-        <span class="training-split-label">${escHtml(sd.name)}</span>
-        <span class="training-split-status ${done.length ? 'done' : 'pending'}">
-          ${done.length ? `${done.length} logged` : 'not logged'}
-        </span>
+      <div class="split-chip${done ? ' done' : ''}">
+        <span class="split-chip-name">${escHtml(sd.name)}</span>
+        ${done
+          ? `<span class="split-chip-check">✓</span>${countBadge}`
+          : `<span class="split-chip-dot">·</span>`}
       </div>
     `;
   }).join('');
+
+  const sessionCountHtml = targetHit
+    ? `<div class="exercise-week-target-hit">Target hit this week.</div>`
+    : `<div class="exercise-week-remaining">${planSessions.length} of ${target} sessions · <span>${remaining} remaining</span></div>`;
+
+  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let sessionListHtml = '';
+  if (weekWorkouts.length > 0) {
+    sessionListHtml = `<div class="exercise-session-list">`;
+    weekWorkouts.forEach(w => {
+      const d   = parseDate(w.date);
+      const dow = DOW[d.getDay() === 0 ? 6 : d.getDay() - 1];
+      const tag = w.splitDayName
+        ? `<span class="exercise-session-tag">${escHtml(w.splitDayName)}</span>`
+        : (w.priority ? `<span class="exercise-session-tag">Strength</span>` : '');
+      sessionListHtml += `
+        <div class="exercise-session-row">
+          <span class="exercise-session-dow">${dow}</span>
+          <span class="exercise-session-label">${escHtml(w.activityLabel || 'Workout')}${tag}</span>
+          <span class="exercise-session-meta">${w.duration} min</span>
+        </div>
+      `;
+    });
+    sessionListHtml += `</div>`;
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title">This Week</div>
+      <div class="split-chips-row">${chips}</div>
+      ${sessionCountHtml}
+      ${sessionListHtml}
+    </div>
+  `;
+}
+
+function renderExercise() {
+  const screen  = document.getElementById('screen-exercise');
+  const workouts = Store.getWorkouts().slice().reverse();
   let html = '';
 
   // Log a Workout -- primary action, first
   html += `<button class="btn btn-primary btn-full mb-16" id="log-workout-btn">+ Log a Workout</button>`;
 
-  // This week summary -- text only, no calendar
-  html += `
-    <div class="card">
-      <div class="card-title">This Week</div>
-      <div class="exercise-week-summary">
-        <div class="exercise-week-stat">
-          <span class="exercise-week-num">${planSessions}</span>
-          <span class="exercise-week-label">plan</span>
-        </div>
-        <div class="exercise-week-divider"></div>
-        <div class="exercise-week-stat">
-          <span class="exercise-week-num">${weekOther.length}</span>
-          <span class="exercise-week-label">other</span>
-        </div>
-        <div class="exercise-week-divider"></div>
-        <div class="exercise-week-stat">
-          <span class="exercise-week-num">${planSessions} / ${target}</span>
-          <span class="exercise-week-label">${remaining === 0 ? 'target hit' : `${remaining} remaining`}</span>
-        </div>
-      </div>
-      <div class="training-split-rows" style="margin-top:12px">
-        ${weekPlanRows}
-      </div>
-    </div>
-  `;
+  html += renderExerciseThisWeek();
 
   // 4-week frequency chart
   html += `
