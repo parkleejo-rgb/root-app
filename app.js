@@ -3943,7 +3943,10 @@ function initTrainingFreqChart() {
   const canvas = document.getElementById('training-freq-chart');
   if (!canvas || typeof Chart === 'undefined') return;
   if (trainingFreqChart) { trainingFreqChart.destroy(); trainingFreqChart = null; }
-  const workouts = Store.getWorkouts();
+  const workouts = Store.getWorkouts().map(w => ({
+    ...w,
+    date: typeof w.date === 'string' && w.date.includes('-') ? w.date : dateStr(new Date(w.date)),
+  }));
   const weeks = Array.from({ length: 4 }, (_, i) => {
     const ws = new Date(getWeekStart());
     ws.setDate(ws.getDate() - (7 * (3 - i)));
@@ -4734,7 +4737,7 @@ function closeModal() {
 let workoutDraft = { activityId: null, activityLabel: null, priority: false, splitDay: null, splitDayName: null, duration: 30, intensity: 'Moderate', note: '', lockDate: false };
 
 function openWorkoutModal(presetActivity) {
-  workoutDraft = { activityId: null, activityLabel: null, priority: false, splitDay: null, splitDayName: null, duration: 30, intensity: 'Moderate', note: '', date: todayStr(), lockDate: false };
+  workoutDraft = { activityId: null, activityLabel: null, priority: false, splitDay: null, splitDayName: null, duration: 30, intensity: 'Moderate', note: '', date: viewingDate, lockDate: false };
   if (presetActivity && typeof presetActivity === 'object') {
     workoutDraft = { ...workoutDraft, ...presetActivity };
     openModal(renderWorkoutStep2);
