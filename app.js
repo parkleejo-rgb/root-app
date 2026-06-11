@@ -46,7 +46,7 @@ const DEFAULT_HABITS = [
   { id: 'nutr_alcohol',   label: 'Alcohol-free day',                  pillar: 'nutrition', weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   // Training — core first, then bonus, ordered by points descending
   { id: 'train_plan',     label: 'Followed my training plan',         pillar: 'training',  weight: 4, points: 3, retroactive: false, opensWorkout: false, priority: true  },
-  { id: 'train_movement', label: 'Got my daily movement in',          pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
+  { id: 'train_movement', label: 'Hit my step goal',                   pillar: 'training',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false },
   { id: 'train_cardio',   label: 'Extra cardio session',              pillar: 'training',  weight: 2, points: 1, retroactive: false, opensWorkout: true,  priority: false },
   // Recovery — all bonus, ordered by points descending
   { id: 'rec_mobility',   label: 'Did mobility or stretching',        pillar: 'recovery',  weight: 1, points: 1, retroactive: false, opensWorkout: false, priority: false, alsoContributes: 'training', alsoWeight: 1 },
@@ -65,7 +65,7 @@ const HABIT_RATIONALE = {
   nutr_omega3:    "Omega-3 fatty acids (EPA and DHA) reliably reduce triglycerides, a cardiovascular risk factor alongside LDL cholesterol. Evidence for direct LDL reduction is weaker and inconsistent, but triglyceride lowering is robust. Best food sources: salmon, sardines, mackerel, trout, chia seeds, flaxseed, and walnuts. A supplement is a reasonable option if food sources are limited. Evidence quality: strong for triglycerides, moderate for other cardiovascular outcomes.",
   nutr_alcohol:   "Alcohol raises triglycerides, disrupts sleep architecture, and contributes calories without any nutritional value relevant to body recomposition. Regular consumption is associated with increased cardiovascular risk and is linked to increased cancer risk in observational research. Even moderate intake impairs sleep quality in ways that may not be subjectively noticeable. Evidence quality: strong for triglycerides and sleep disruption.",
   train_plan:     "Resistance training is the foundation of body recomposition. It stimulates muscle protein synthesis, increases lean mass, raises resting metabolic rate, and improves insulin sensitivity. ACSM recommends training each muscle group 2 to 3 times per week for hypertrophy, with at least 48 hours between sessions for the same muscle groups. Progressive overload -- gradually increasing load or volume over time -- is necessary for continued adaptation. Rest days are part of the plan. Evidence quality: very strong.",
-  train_movement: "Low-intensity movement throughout the day, sometimes called NEAT (non-exercise activity thermogenesis), contributes meaningfully to total daily energy expenditure and cardiovascular health independently of structured exercise. A 10-minute walk, taking stairs, or any activity that breaks up prolonged sitting counts. This habit is about not being sedentary on top of your training -- it does not require a formal workout and does not meaningfully impair recovery from strength training. Evidence quality: moderate.",
+  train_movement: "Daily step count contributes meaningfully to cardiovascular health independently of structured exercise. A 2023 meta-analysis in the European Journal of Preventive Cardiology found each additional 1,000 steps per day was associated with a 15% lower risk of cardiovascular mortality, with strong benefits observed at 7,000 to 8,000 steps per day. For someone already strength training, hitting a daily step floor adds cardiovascular benefit without impairing recovery. On heavy training days you may fall short -- that is fine. The habit is about the other 23 hours, not the workout itself. Check your phone's health app to see your step count. Evidence quality: strong from large observational studies.",
   train_cardio:   "This habit is for dedicated cardio or conditioning done in addition to your regular training plan -- a run, bike ride, swim, rowing session, or conditioning circuit on a rest day or extra session day. If cardio is already part of your training plan for today, check that habit instead and log it there. Cardiovascular exercise improves VO2 max, supports heart health, and helps manage triglycerides and blood pressure. It is complementary to strength training for body recomposition but secondary to it for muscle building specifically. Evidence quality: strong for cardiovascular health.",
   rec_mobility:   "Regular mobility work supports joint health, movement quality, and injury prevention over time. Injury prevention is the primary value here -- consistent training across months and years depends on staying healthy. A 15-minute session of stretching, yoga, or dedicated mobility work is enough to maintain range of motion and reduce injury risk. Evidence for direct hypertrophy benefits from mobility work alone is limited. Evidence quality: moderate for injury prevention and training longevity.",
   rec_outside:    "Time outdoors is associated with lower self-reported stress and improved mood in multiple observational studies. Effect sizes are modest but consistent. Outdoor time also adds incidental light exposure and movement. Evidence quality: moderate, primarily observational.",
@@ -100,7 +100,7 @@ const CORE_HABIT_PUSHBACK = {
   nutr_heart:     "Limiting saturated fat and avoiding processed meat is the primary dietary lever for LDL cholesterol alongside medication. It is one of the most evidence-supported nutrition behaviors for cardiovascular health. Are you sure?",
   nutr_fiber:     "Soluble fiber has strong evidence for LDL reduction -- one of the most effective dietary interventions for high cholesterol. One fiber-rich meal a day is all it takes to get a meaningful effect. Are you sure?",
   sleep_bed:      "Sleep restriction reduces muscle protein synthesis and impairs recovery. It is a meaningful lever for both body composition and cardiovascular health. Are you sure?",
-  train_movement: "Low-intensity daily movement contributes independently to cardiovascular health and total energy expenditure. It requires very little recovery cost and adds up significantly over weeks. Are you sure?",
+  train_movement: "Daily steps contribute independently to cardiovascular health on top of your training. Even on rest days, hitting a step goal keeps your heart health habits consistent. Are you sure?",
 };
 
 const BADGE_DEFINITIONS = [
@@ -152,6 +152,7 @@ const DEFAULT_SETTINGS = {
   proteinCalcMethod: 'current', // 'current' | 'target' | 'manual'
   // Training plan
   weeklySessionTarget: 3,
+  stepGoal: 8000,
   trainingSplit: 'full_body', // 'full_body' | 'upper_lower' | 'ppl' | 'ppl_ul' | 'custom'
   customSplitDays: [],
   pointsConversionRate: 0.50,
@@ -248,7 +249,7 @@ const Store = {
       { id: 'nutr_fiber',     oldLabels: ['Soluble fiber today', 'Approx 25 to 30g fiber throughout day', 'Fiber-rich food today (oats, beans, lentils, or fruit)', 'Had a fiber-rich meal today'], newLabel: 'Had a fiber-rich meal' },
       { id: 'nutr_omega3',    oldLabels: ['Omega-3 source today'],                                                                                             newLabel: 'Had an omega-3 source' },
       { id: 'nutr_alcohol',   oldLabels: ['Alcohol-free today'],                                                                                               newLabel: 'Alcohol-free day' },
-      { id: 'train_movement', oldLabels: ['Movement floor hit today', 'Daily walk or movement today'],                                                         newLabel: 'Got my daily movement in' },
+      { id: 'train_movement', oldLabels: ['Movement floor hit today', 'Daily walk or movement today', 'Got my daily movement in'],                             newLabel: null },
       { id: 'train_cardio',   oldLabels: ['Cardio or conditioning session', 'Extra cardio session'],                                                           newLabel: 'Extra cardio session' },
       { id: 'rec_mobility',   oldLabels: ['Mobility or stretching', 'Mobility or stretching (15+ min)'],                                                      newLabel: 'Did mobility or stretching' },
       { id: 'rec_outside',    oldLabels: ['Got outside today (non-workout)', 'Got outside today', 'Got outside within an hour of waking'],                    newLabel: 'Got outside' },
@@ -328,6 +329,11 @@ const Store = {
         const h12 = hh % 12 || 12;
         const label = mm === 0 ? `In bed by ${h12}${period}` : `In bed by ${h12}:${String(mm).padStart(2,'0')}${period}`;
         return { ...h, label };
+      }
+      if (h.id === 'train_movement') {
+        const goal = s.stepGoal || 8000;
+        const formatted = goal.toLocaleString();
+        return { ...h, label: `Hit ${formatted} steps` };
       }
       return h;
     });
@@ -1216,10 +1222,18 @@ function openRetroChecklist(retroDate) {
     if (coreHabits.length) {
       listHtml += `<div class="retro-section-label">Daily Commitments</div>`;
       coreHabits.forEach(h => {
+        let selectionNote = '';
+        if (h.id === 'train_plan') {
+          const selections = Store.getTrainingSelections();
+          const sel = selections[retroDate];
+          if (sel && checked[h.id]) {
+            selectionNote = `<span class="retro-split-note">${escHtml(sel.splitDayName || sel.splitDay)}</span>`;
+          }
+        }
         listHtml += `
           <label class="retro-habit-row ${checked[h.id] ? 'checked' : ''}">
             <input type="checkbox" data-habit="${h.id}" data-pts="${h.points}" ${checked[h.id] ? 'checked' : ''}>
-            <span class="retro-habit-label">${escHtml(h.label)}</span>
+            <span class="retro-habit-label">${escHtml(h.label)}${selectionNote}</span>
             <span class="retro-habit-pts">${h.points}pt${h.points > 1 ? 's' : ''}</span>
           </label>`;
       });
@@ -1259,6 +1273,7 @@ function openRetroChecklist(retroDate) {
       const prevChecked = Store.getHabits(retroDate);
       const newChecked  = { ...prevChecked };
       let ptsEarned = 0;
+      let needsSplitPicker = false;
 
       body.querySelectorAll('.retro-habit-row input[type=checkbox]').forEach(cb => {
         const hid = cb.dataset.habit;
@@ -1268,17 +1283,29 @@ function openRetroChecklist(retroDate) {
           newChecked[hid] = true;
           Points.add(pts, `Retro: ${hid} (${retroDate})`);
           ptsEarned += pts;
+          if (hid === 'train_plan') needsSplitPicker = true;
         } else if (!cb.checked && prevChecked[hid]) {
           // Unchecked retroactively — deduct
           delete newChecked[hid];
           Points.deduct(pts, `Retro uncheck: ${hid} (${retroDate})`);
+          if (hid === 'train_plan') {
+            const selections = Store.getTrainingSelections();
+            delete selections[retroDate];
+            Store.saveTrainingSelections(selections);
+          }
         }
       });
 
       Store.saveHabits(retroDate, newChecked);
       Streak.recompute();
-      closeModal();
       updatePointsBadge();
+
+      if (needsSplitPicker) {
+        openRetroSplitPicker(retroDate);
+        return;
+      }
+
+      closeModal();
       if (currentScreen === 'today') renderToday();
       if (currentScreen === 'week') renderWeek();
 
@@ -1295,8 +1322,14 @@ function openRetroChecklist(retroDate) {
 
 let currentScreen = 'today';
 let weightChart = null;
+let viewingDate = todayStr();
 
 function navigate(screen) {
+  if (screen !== 'today') {
+    viewingDate = todayStr();
+    Store.set('date_strip_week_offset', 0);
+  }
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
@@ -2117,11 +2150,102 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
     </div>`;
 }
 
-function renderToday() {
-  const screen  = document.getElementById('screen-today');
+function renderDateStrip() {
   const today   = todayStr();
-  const checked = Store.getHabits(today);
-  const habits  = Store.getHabitDefs().filter(h => h.enabled !== false);
+  const viewing = viewingDate;
+  const weekOffset = Store.get('date_strip_week_offset', 0);
+  const anchor = new Date(getWeekStart());
+  anchor.setDate(anchor.getDate() + (weekOffset * 7));
+  const days = getWeekDays(anchor);
+  const DOW_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const canGoBack    = weekOffset > -1;
+  const canGoForward = weekOffset < 0;
+
+  const dayCols = days.map((d, i) => {
+    const isPast    = d < today;
+    const isToday   = d === today;
+    const isFuture  = d > today;
+    const isViewing = d === viewing;
+    const isDisabled = isFuture;
+    const date = parseDate(d);
+    const dayNum = date.getDate();
+    const checkedHabits = Store.getHabits(d);
+    const habits = Store.getHabitDefs().filter(h => h.enabled !== false);
+    const hasAnyLogged = habits.some(h => checkedHabits[h.id]);
+    let colClass = 'date-strip-col';
+    if (isViewing)  colClass += ' selected';
+    if (isToday)    colClass += ' today';
+    if (isDisabled) colClass += ' disabled';
+    if (isPast && hasAnyLogged) colClass += ' has-data';
+    return `
+      <button class="${colClass}" data-date="${d}" ${isDisabled ? 'disabled' : ''} aria-label="${DOW_SHORT[i]} ${dayNum}${isToday ? ', today' : ''}${isViewing ? ', selected' : ''}">
+        <span class="date-strip-dow">${DOW_SHORT[i]}</span>
+        <span class="date-strip-num">${dayNum}</span>
+        ${(isPast || isToday) && hasAnyLogged ? '<span class="date-strip-dot"></span>' : '<span class="date-strip-dot empty"></span>'}
+      </button>
+    `;
+  }).join('');
+
+  return `
+    <div class="date-strip-wrap">
+      <button class="date-strip-nav" id="date-strip-back" ${canGoBack ? '' : 'disabled'} aria-label="Previous week">‹</button>
+      <div class="date-strip-days" id="date-strip-days">
+        ${dayCols}
+      </div>
+      <button class="date-strip-nav" id="date-strip-fwd" ${canGoForward ? '' : 'disabled'} aria-label="Next week">›</button>
+    </div>
+  `;
+}
+
+function renderPastDateBanner() {
+  if (viewingDate === todayStr()) return '';
+  const d = parseDate(viewingDate);
+  const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  return `
+    <div class="past-date-banner">
+      <span class="past-date-banner-label">Logging for ${label}</span>
+      <button class="past-date-banner-today" id="go-to-today-btn">Back to today</button>
+    </div>
+  `;
+}
+
+function bindDateStrip(screen) {
+  screen.querySelectorAll('.date-strip-col:not(.disabled)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const d = btn.dataset.date;
+      if (!d) return;
+      viewingDate = d;
+      renderToday();
+    });
+  });
+  screen.querySelector('#date-strip-back')?.addEventListener('click', () => {
+    const current = Store.get('date_strip_week_offset', 0);
+    if (current > -1) {
+      Store.set('date_strip_week_offset', current - 1);
+      renderToday();
+    }
+  });
+  screen.querySelector('#date-strip-fwd')?.addEventListener('click', () => {
+    const current = Store.get('date_strip_week_offset', 0);
+    if (current < 0) {
+      Store.set('date_strip_week_offset', current + 1);
+      if (current + 1 === 0) viewingDate = todayStr();
+      renderToday();
+    }
+  });
+  screen.querySelector('#go-to-today-btn')?.addEventListener('click', () => {
+    viewingDate = todayStr();
+    Store.set('date_strip_week_offset', 0);
+    renderToday();
+  });
+}
+
+function renderToday() {
+  const screen    = document.getElementById('screen-today');
+  const today     = todayStr();
+  const viewDate  = viewingDate;
+  const checked   = Store.getHabits(viewDate);
+  const habits    = Store.getHabitDefs().filter(h => h.enabled !== false);
 
   // Temptation bundling
   const bundleData    = TBundle.getData();
@@ -2138,53 +2262,60 @@ function renderToday() {
   const totalAll   = habits.length;
   const nowHour    = new Date().getHours();
   const onTheLine  = nowHour >= 18 && coreDone < 5 && streakData.current > 0;
+  const showStreakUI = viewDate === today;
 
   const pillars = ['sleep', 'nutrition', 'training', 'recovery'];
 
   let html = '';
 
+  html += renderDateStrip();
+  html += renderPastDateBanner();
+
   // Summary row: total done + streak counter
+  const countLabel = viewDate === today ? 'habits done today' : 'habits done that day';
   html += `
     <div class="today-summary-row">
-      <span id="today-habit-count" class="today-habit-count">${totalDone} of ${totalAll} habits done today</span>
-      ${streakData.current > 0
+      <span id="today-habit-count" class="today-habit-count">${totalDone} of ${totalAll} ${countLabel}</span>
+      ${showStreakUI && streakData.current > 0
         ? `<span id="streak-counter" class="streak-counter">🔥 ${streakData.current}-day streak</span>`
         : `<span id="streak-counter" class="streak-counter" style="display:none"></span>`}
     </div>
   `;
 
-  // Grace day note
-  if (streakData.showGraceNote) {
-    html += `<div class="streak-note">Grace day used — streak intact.</div>`;
-    streakData.showGraceNote = false;
-    Streak.saveData(streakData);
+  if (showStreakUI) {
+    // Grace day note
+    if (streakData.showGraceNote) {
+      html += `<div class="streak-note">Grace day used — streak intact.</div>`;
+      streakData.showGraceNote = false;
+      Streak.saveData(streakData);
+    }
+
+    // Streak broken message
+    if (streakData.showBrokenNote) {
+      html += `<div class="streak-note">Streak reset. Your best was ${streakData.bestAtBreak} days. Build a new one.</div>`;
+      streakData.showBrokenNote = false;
+      Streak.saveData(streakData);
+    }
+
+    // "Streak on the line" banner
+    html += `
+      <div id="streak-on-line-banner" class="streak-on-line" ${onTheLine ? '' : 'style="display:none"'}>
+        Your ${streakData.current}-day streak is on the line today.
+      </div>
+    `;
   }
 
-  // Streak broken message
-  if (streakData.showBrokenNote) {
-    html += `<div class="streak-note">Streak reset. Your best was ${streakData.bestAtBreak} days. Build a new one.</div>`;
-    streakData.showBrokenNote = false;
-    Streak.saveData(streakData);
+  // Optional feature cards (only when viewing today)
+  if (viewDate === today) {
+    html += `<div id="today-optional-cards">`;
+    html += renderSleepCard();
+    html += renderMoodCard();
+    html += renderPhotoPromptCard();
+    html += renderMeasurementPromptCard();
+    html += `</div>`;
+  } else {
+    html += `<div id="today-optional-cards"></div>`;
   }
-
-  // "Streak on the line" banner
-  html += `
-    <div id="streak-on-line-banner" class="streak-on-line" ${onTheLine ? '' : 'style="display:none"'}>
-      Your ${streakData.current}-day streak is on the line today.
-    </div>
-  `;
-
-  // Training day grid strip
-  const todayWeekDays = getWeekDays(getWeekStart());
-  html += `<div class="today-training-strip">${renderTrainingDayGrid(todayWeekDays, today, Store.getSettings())}</div>`;
-
-  // Optional feature cards (sleep, mood, photos, measurements)
-  html += `<div id="today-optional-cards">`;
-  html += renderSleepCard();
-  html += renderMoodCard();
-  html += renderPhotoPromptCard();
-  html += renderMeasurementPromptCard();
-  html += `</div>`;
 
   // Top section: all core habits
   const coreHabits = habits.filter(h => CORE_HABIT_IDS.includes(h.id));
@@ -2226,18 +2357,17 @@ function renderToday() {
     html += `</div>`;
   });
 
-  // Retroactive logging link
-  html += `<div class="retro-log-row"><button class="btn-text-link" id="retro-log-btn">Log a past day</button></div>`;
-
   screen.innerHTML = html;
 
-  screen.querySelector('#retro-log-btn')?.addEventListener('click', openRetroDatePicker);
-
   // Bind optional feature cards
-  bindSleepCard(screen);
-  bindMoodCard(screen);
-  bindPhotoPromptCard(screen);
-  bindMeasurementPromptCard(screen);
+  if (viewDate === today) {
+    bindSleepCard(screen);
+    bindMoodCard(screen);
+    bindPhotoPromptCard(screen);
+    bindMeasurementPromptCard(screen);
+  }
+
+  bindDateStrip(screen);
 
   // Habit events: check-zone → toggle, tap-zone → expand detail, prompt handlers
   screen.querySelectorAll('.habit-item').forEach(item => {
@@ -2247,9 +2377,9 @@ function renderToday() {
     item.querySelector('.habit-check-zone')?.addEventListener('click', e => {
       e.stopPropagation();
       if (id === 'train_plan') {
-        const todayChecked = Store.getHabits(todayStr());
-        if (!todayChecked['train_plan']) {
-          openTrainingPlanPicker(item, todayStr());
+        const dateChecked = Store.getHabits(viewDate);
+        if (!dateChecked['train_plan']) {
+          openTrainingPlanPicker(item, viewDate);
           return;
         }
       }
@@ -2297,6 +2427,7 @@ function renderToday() {
 }
 
 function updateStreakDisplay() {
+  if (viewingDate !== todayStr()) return;
   const today   = todayStr();
   const checked = Store.getHabits(today);
   const habits  = Store.getHabitDefs().filter(h => h.enabled !== false);
@@ -2337,7 +2468,7 @@ function updateStreakDisplay() {
 }
 
 function toggleHabit(item) {
-  const today   = todayStr();
+  const today   = viewingDate;
   const id      = item.dataset.habit;
   const checked = Store.getHabits(today);
   const habits  = Store.getHabitDefs();
@@ -2364,6 +2495,7 @@ function toggleHabit(item) {
       setTimeout(() => Streak.showBadgeCelebration(newStreakBadges[0]), newBadges.length ? 800 : 400);
     }
 
+    Streak.recompute();
     updateStreakDisplay();
 
     // Reveal bundle prompt if newly eligible
@@ -2382,6 +2514,7 @@ function toggleHabit(item) {
     item.classList.remove('checked');
     Points.deduct(habit.points, `Habit unchecked: ${habit.label}`);
     updatePointsBadge();
+    Streak.recompute();
     updateStreakDisplay();
   }
 }
@@ -2452,6 +2585,49 @@ function openTrainingPlanPicker(item, date) {
         });
         body.querySelector('#tplan-log-skip').addEventListener('click', closeModal);
       });
+    });
+  });
+}
+
+function openRetroSplitPicker(retroDate) {
+  const settings  = Store.getSettings();
+  const splitDays = getSplitDays(settings);
+  openModal(body => {
+    body.innerHTML = `
+      <div class="modal-title">What did you train?</div>
+      <p class="text-small text-muted mb-12">Optional -- helps track your split coverage.</p>
+      <div class="training-split-grid">
+        ${splitDays.map(d => `
+          <button class="training-split-btn" data-split-id="${d.id}" data-split-name="${escHtml(d.name)}">
+            ${escHtml(d.name)}
+          </button>
+        `).join('')}
+        <button class="training-split-btn training-split-rest" data-split-id="rest" data-split-name="Rest day">
+          Rest day / Easy movement
+        </button>
+      </div>
+      <button class="btn btn-outline btn-full mt-8" id="retro-split-skip">Skip</button>
+    `;
+    body.querySelectorAll('.training-split-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const splitId   = btn.dataset.splitId;
+        const splitName = btn.dataset.splitName;
+        const selections = Store.getTrainingSelections();
+        selections[retroDate] = { splitDay: splitId, splitDayName: splitName };
+        Store.saveTrainingSelections(selections);
+        closeModal();
+        Streak.recompute();
+        if (currentScreen === 'today') renderToday();
+        if (currentScreen === 'exercise') renderExercise();
+        if (currentScreen === 'week') renderWeek();
+        showToast('Logged', 'success');
+      });
+    });
+    body.querySelector('#retro-split-skip')?.addEventListener('click', () => {
+      closeModal();
+      Streak.recompute();
+      if (currentScreen === 'today') renderToday();
+      if (currentScreen === 'exercise') renderExercise();
     });
   });
 }
@@ -2883,12 +3059,42 @@ function renderExercise() {
   const settings = Store.getSettings();
   const workouts = Store.getWorkouts().slice().reverse();
   const ws       = getWeekStart();
-  const days     = getWeekDays(ws);
-  const today    = todayStr();
+  const wsStr    = dateStr(ws);
+  const we       = new Date(ws); we.setDate(we.getDate() + 6);
+  const weStr    = dateStr(we);
+  const weekWorkouts  = workouts.filter(w => w.date >= wsStr && w.date <= weStr);
+  const weekStrength  = weekWorkouts.filter(w => w.priority);
+  const weekOther     = weekWorkouts.filter(w => !w.priority);
+  const totalSessions = weekWorkouts.length;
+  const target        = settings.weeklySessionTarget || 3;
+  const remaining     = Math.max(0, target - totalSessions);
   let html = '';
 
-  // Training week card (moved from This Week screen)
-  html += renderTrainingWeekCard(days, today, settings);
+  // Log a Workout -- primary action, first
+  html += `<button class="btn btn-primary btn-full mb-16" id="log-workout-btn">+ Log a Workout</button>`;
+
+  // This week summary -- text only, no calendar
+  html += `
+    <div class="card">
+      <div class="card-title">This Week</div>
+      <div class="exercise-week-summary">
+        <div class="exercise-week-stat">
+          <span class="exercise-week-num">${weekStrength.length}</span>
+          <span class="exercise-week-label">strength</span>
+        </div>
+        <div class="exercise-week-divider"></div>
+        <div class="exercise-week-stat">
+          <span class="exercise-week-num">${weekOther.length}</span>
+          <span class="exercise-week-label">other</span>
+        </div>
+        <div class="exercise-week-divider"></div>
+        <div class="exercise-week-stat">
+          <span class="exercise-week-num">${totalSessions} / ${target}</span>
+          <span class="exercise-week-label">${remaining === 0 ? 'target hit' : `${remaining} remaining`}</span>
+        </div>
+      </div>
+    </div>
+  `;
 
   // 4-week frequency chart
   html += `
@@ -2897,9 +3103,6 @@ function renderExercise() {
       <div class="chart-wrap" style="height:140px"><canvas id="training-freq-chart"></canvas></div>
     </div>
   `;
-
-  // Log workout button
-  html += `<button class="btn btn-primary btn-full mb-16" id="log-workout-btn">+ Log a Workout</button>`;
 
   // Workout history
   if (workouts.length === 0) {
@@ -2945,7 +3148,6 @@ function renderExercise() {
     });
   });
 
-  // Init frequency chart after DOM is ready
   requestAnimationFrame(() => initTrainingFreqChart());
 }
 
@@ -3855,6 +4057,14 @@ function renderSettings() {
             <button class="stepper-btn" id="s-sessions-plus">+</button>
           </div>
         </div>
+        <div class="settings-row" style="align-items:center">
+          <div class="settings-row-label">Daily step goal</div>
+          <div class="stepper-row" style="display:flex;align-items:center;gap:8px">
+            <button class="stepper-btn" id="s-steps-minus">−</button>
+            <span id="s-steps-val" style="min-width:40px;text-align:center;font-weight:500">${(s.stepGoal || 8000).toLocaleString()}</span>
+            <button class="stepper-btn" id="s-steps-plus">+</button>
+          </div>
+        </div>
         <div class="settings-btn-row" id="s-edit-training-plan">
           <div class="settings-btn-label">Edit training split</div>
           <div class="settings-btn-desc">Add, rename, or remove split days</div>
@@ -4144,6 +4354,26 @@ function renderSettings() {
     s2.weeklySessionTarget = cur + 1;
     Store.saveSettings(s2);
     screen.querySelector('#s-sessions-val').textContent = s2.weeklySessionTarget;
+  });
+
+  // Step goal stepper
+  screen.querySelector('#s-steps-minus')?.addEventListener('click', () => {
+    const s2 = Store.getSettings();
+    const cur = s2.stepGoal || 8000;
+    if (cur <= 5000) return;
+    s2.stepGoal = cur - 1000;
+    Store.saveSettings(s2);
+    screen.querySelector('#s-steps-val').textContent = s2.stepGoal.toLocaleString();
+    if (currentScreen === 'today') renderToday();
+  });
+  screen.querySelector('#s-steps-plus')?.addEventListener('click', () => {
+    const s2 = Store.getSettings();
+    const cur = s2.stepGoal || 8000;
+    if (cur >= 12000) return;
+    s2.stepGoal = cur + 1000;
+    Store.saveSettings(s2);
+    screen.querySelector('#s-steps-val').textContent = s2.stepGoal.toLocaleString();
+    if (currentScreen === 'today') renderToday();
   });
 
   screen.querySelector('#s-sheets-connect')?.addEventListener('click', async () => {

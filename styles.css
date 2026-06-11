@@ -2305,75 +2305,168 @@ textarea.form-input {
   background: var(--sage-light);
 }
 
-/* Training day grid */
-.training-day-grid {
+/* ── Date Navigation Strip ── */
+.date-strip-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 10px 12px 8px;
+  background: var(--card-bg);
+  border-radius: 12px;
+}
+.date-strip-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
-  margin: 10px 0 6px;
+  gap: 2px;
+  flex: 1;
 }
-.training-day-col {
+.date-strip-nav {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.date-strip-nav:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+.date-strip-col {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 5px 1px;
+  gap: 2px;
+  padding: 5px 2px 4px;
   border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-.training-day-col.today {
-  background: rgba(45, 74, 62, 0.07);
+.date-strip-col:not(.disabled):hover {
+  background: rgba(45, 74, 62, 0.06);
 }
-.training-day-label {
+.date-strip-col.disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.date-strip-col.selected {
+  background: rgba(45, 74, 62, 0.1);
+}
+.date-strip-col.today .date-strip-num {
+  color: var(--sage);
+  font-weight: 700;
+}
+.date-strip-dow {
   font-size: 9px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  line-height: 1;
 }
-.training-day-dot {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: transparent;
-}
-.training-day-dot.filled {
-  background: var(--sage);
-  border-color: var(--sage);
-}
-.training-day-dot.rest {
-  background: transparent;
-  border-color: var(--text-muted);
-  border-style: dashed;
-}
-.training-day-dot.future {
-  opacity: 0.2;
-  border-color: var(--border);
-}
-.training-day-dot.empty {
-  opacity: 0.4;
-}
-.training-day-name {
-  font-size: 8px;
+.date-strip-num {
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text-muted);
-  text-align: center;
-  min-height: 11px;
-  line-height: 1.2;
-}
-.training-day-col.today .training-day-name {
   color: var(--text);
+  line-height: 1;
+}
+.date-strip-col.selected .date-strip-num {
+  color: var(--sage-dark);
+  font-weight: 700;
+}
+.date-strip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sage);
+  margin-top: 1px;
+}
+.date-strip-dot.empty {
+  background: transparent;
+}
+
+/* ── Past Date Banner ── */
+.past-date-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(45, 74, 62, 0.08);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+.past-date-banner-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sage-dark);
+}
+.past-date-banner-today {
+  font-size: 12px;
   font-weight: 600;
+  color: var(--sage);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
-.training-day-col.today .training-day-dot.filled {
-  box-shadow: 0 0 0 3px rgba(45, 74, 62, 0.15);
+
+/* ── Exercise Week Summary ── */
+.exercise-week-summary {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px 0 8px;
 }
-.today-training-strip {
-  margin: 6px 0 2px;
-  padding: 8px 12px 4px;
-  background: var(--card-bg);
-  border-radius: 12px;
+.exercise-week-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
-.today-training-strip .training-day-grid {
-  margin: 0;
+.exercise-week-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.exercise-week-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.exercise-week-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Retro Split Note ── */
+.retro-split-note {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sage);
+  background: rgba(45, 74, 62, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
 }
