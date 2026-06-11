@@ -1,6 +1,6 @@
 /* Root Service Worker — cache-first for offline PWA support */
 
-const CACHE = 'root-v4';
+const CACHE = 'root-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,36 @@ self.addEventListener('activate', e => {
   );
   self.clients.claim();
 });
+
+// ─── Push notifications ───────────────────────────────────────────────────────
+
+self.addEventListener('push', e => {
+  let data = { title: 'Root', body: 'Time to check your habits.' };
+  try { data = { ...data, ...e.data.json() }; } catch {}
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body:  data.body,
+      icon:  './apple-touch-icon.png',
+      badge: './apple-touch-icon.png',
+      tag:   data.tag || 'root',
+      renotify: false,
+      data:  { url: self.registration.scope },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = e.notification.data?.url || self.registration.scope;
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.startsWith(target) && 'focus' in c);
+      return existing ? existing.focus() : clients.openWindow(target);
+    })
+  );
+});
+
+// ─── Cache / fetch ────────────────────────────────────────────────────────────
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);

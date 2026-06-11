@@ -1,0 +1,19 @@
+name = "root-push"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+# Cron runs every 30 minutes — close enough for notification timing
+[triggers]
+crons = ["*/30 * * * *"]
+
+# KV namespace for push subscriptions
+# After creating the namespace with `wrangler kv:namespace create SUBS`,
+# paste the id below and in the preview_id for local dev.
+[[kv_namespaces]]
+binding = "SUBS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_NAMESPACE_PREVIEW_ID"
+
+# VAPID keys — set as secrets, never commit them.
+# Run: wrangler secret put VAPID_PRIVATE_JWK   (paste the JSON string)
+# The public key goes in app.js as VAPID_PUBLIC_KEY (safe to commit).

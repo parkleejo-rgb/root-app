@@ -135,6 +135,12 @@ const BADGE_DEFINITIONS = [
 // Enable the Google Sheets API and add your app's origin to allowed JavaScript origins.
 const GOOGLE_CLIENT_ID = '763862383625-3gpodcsd248v47k5f35oh2ptobendksu.apps.googleusercontent.com';
 
+// ─── Web Push config ──────────────────────────────────────────────────────────
+// After running `node worker/generate-keys.mjs`, paste the public key here.
+// The worker URL is your Cloudflare Workers deployment URL.
+const VAPID_PUBLIC_KEY  = ''; // e.g. 'BFb3...Xk='  — base64url uncompressed P-256 key
+const PUSH_WORKER_URL   = ''; // e.g. 'https://root-push.YOUR_SUBDOMAIN.workers.dev'
+
 const DEFAULT_SETTINGS = {
   name: '',
   startingWeight: null,
@@ -1502,6 +1508,105 @@ const Notifications = {
     }
 
     if (Object.keys(fired).length) Store.set('notif_fired_' + today, fired);
+  },
+};
+
+/* ─── Web Push Module ────────────────────────────────────────────────────────
+ * Manages the PushSubscription lifecycle and syncs prefs to the Cloudflare
+ * Worker. Only active when VAPID_PUBLIC_KEY and PUSH_WORKER_URL are set.
+ */
+
+const Push = {
+  isConfigured() {
+    return !!(VAPID_PUBLIC_KEY && PUSH_WORKER_URL);
+  },
+
+  isSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window;
+  },
+
+  // Stored endpoint identifies this device's subscription on the worker
+  getEndpoint() { return localStorage.getItem('root_push_endpoint') || null; },
+  setEndpoint(ep) {
+    if (ep) localStorage.setItem('root_push_endpoint', ep);
+    else    localStorage.removeItem('root_push_endpoint');
+  },
+
+  // Convert urlBase64 VAPID key to Uint8Array for PushManager.subscribe
+  _vapidKey() {
+    const base64 = VAPID_PUBLIC_KEY.replace(/-/g, '+').replace(/_/g, '/');
+    const pad    = '='.repeat((4 - base64.length % 4) % 4);
+    const raw    = atob(base64 + pad);
+    const bytes  = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes;
+  },
+
+  _prefsFromSettings(s) {
+    return {
+      streakProtection: !!s.notifStreakProtection,
+      weighIn:          !!s.notifWeighIn,
+      bedtime:          !!s.notifBedtime,
+      morningCheckin:   !!s.notifMorningCheckin,
+      morningTime:      s.notifMorningTime || '08:00',
+      tzOffset:         -new Date().getTimezoneOffset(), // minutes east of UTC
+    };
+  },
+
+  // Subscribe (or re-subscribe) and push prefs to worker
+  async subscribe() {
+    if (!this.isConfigured() || !this.isSupported()) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: this._vapidKey(),
+        });
+      }
+      this.setEndpoint(sub.endpoint);
+      const prefs = this._prefsFromSettings(Store.getSettings());
+      await fetch(`${PUSH_WORKER_URL}/push/subscribe`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ subscription: sub.toJSON(), prefs }),
+      });
+      return true;
+    } catch (err) {
+      console.error('Push subscribe failed:', err);
+      return false;
+    }
+  },
+
+  // Update prefs on worker without re-subscribing
+  async updatePrefs() {
+    const endpoint = this.getEndpoint();
+    if (!this.isConfigured() || !endpoint) return;
+    const prefs = this._prefsFromSettings(Store.getSettings());
+    fetch(`${PUSH_WORKER_URL}/push/update-prefs`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ endpoint, prefs }),
+    }).catch(() => {});
+  },
+
+  // Unsubscribe from both PushManager and worker
+  async unsubscribe() {
+    const endpoint = this.getEndpoint();
+    if (endpoint && this.isConfigured()) {
+      fetch(`${PUSH_WORKER_URL}/push/unsubscribe`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ endpoint }),
+      }).catch(() => {});
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+    } catch {}
+    this.setEndpoint(null);
   },
 };
 
@@ -4074,19 +4179,29 @@ function renderSheetsSyncSection() {
       </div>`;
   }
 
+  if (needsReauth) {
+    return `
+      <div class="settings-group">
+        <div style="padding:13px 16px">
+          <p style="color:#b45309;font-size:13px;margin-bottom:10px">Google Sheets backup needs to reconnect. Last synced: ${lastSynced}.</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" id="s-sheets-connect" style="flex:1">Reconnect</button>
+            <button class="btn btn-outline btn-sm" id="s-sheets-disconnect" style="flex:1;color:var(--text-muted)">Disconnect</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   return `
     <div class="settings-group">
       <div style="padding:13px 16px">
-        ${needsReauth ? `<p style="color:#b45309;font-size:13px;margin-bottom:10px;font-style:italic">Google Sheets sync hasn't connected in 7 days. Tap Reconnect below.</p>` : ''}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span style="font-size:14px;font-weight:500;color:var(--text)">Connected ✓</span>
           ${account ? `<span style="font-size:12px;color:var(--text-muted)">${escHtml(account)}</span>` : ''}
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Last synced: ${lastSynced}${pending ? ' · Sync pending' : ''}</div>
         <div style="display:flex;gap:8px">
-          ${needsReauth
-            ? `<button class="btn btn-outline btn-sm" id="s-sheets-connect" style="flex:1">Reconnect</button>`
-            : `<button class="btn btn-outline btn-sm" id="s-sheets-sync" style="flex:1">Sync now</button>`}
+          <button class="btn btn-outline btn-sm" id="s-sheets-sync" style="flex:1">Sync now</button>
           <button class="btn btn-outline btn-sm" id="s-sheets-disconnect" style="flex:1;color:var(--text-muted)">Disconnect</button>
         </div>
       </div>
@@ -4414,20 +4529,41 @@ function renderSettings() {
   ];
   notifToggles.forEach(([elId, key]) => {
     screen.querySelector('#' + elId)?.addEventListener('change', async e => {
-      const s = Store.getSettings();
+      const s2 = Store.getSettings();
+
+      // Request OS permission on first enable
       if (e.target.checked && Notification.permission !== 'granted') {
         const perm = await Notifications.requestPermission();
         if (perm !== 'granted') { e.target.checked = false; renderSettings(); return; }
       }
-      s[key] = e.target.checked;
-      Store.saveSettings(s);
+
+      s2[key] = e.target.checked;
+      Store.saveSettings(s2);
+
+      // Sync with push worker
+      if (Push.isConfigured() && Push.isSupported()) {
+        const anyEnabled = s2.notifStreakProtection || s2.notifWeighIn ||
+                           s2.notifBedtime || s2.notifMorningCheckin;
+        if (e.target.checked && !Push.getEndpoint()) {
+          // First notification turned on — subscribe
+          const ok = await Push.subscribe();
+          if (!ok) showToast('Push subscription failed. Check worker setup.', 'error');
+        } else if (!anyEnabled && Push.getEndpoint()) {
+          // All notifications turned off — unsubscribe
+          Push.unsubscribe();
+        } else if (Push.getEndpoint()) {
+          // Prefs changed — update worker
+          Push.updatePrefs();
+        }
+      }
     });
   });
 
   screen.querySelector('#s-notif-morning-time')?.addEventListener('change', e => {
-    const s = Store.getSettings();
-    s.notifMorningTime = e.target.value;
-    Store.saveSettings(s);
+    const s2 = Store.getSettings();
+    s2.notifMorningTime = e.target.value;
+    Store.saveSettings(s2);
+    if (Push.getEndpoint()) Push.updatePrefs();
   });
 
   screen.querySelector('#s-edit-measurements')?.addEventListener('click', () => {
