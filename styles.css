@@ -291,6 +291,14 @@
 
 html { height: 100%; -webkit-tap-highlight-color: transparent; }
 
+button,
+[role="button"],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
@@ -2489,6 +2497,224 @@ textarea.form-input {
   flex-shrink: 0;
 }
 
+/* ── Root Training Plan Card ── */
+.training-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.training-plan-head,
+.exercise-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.training-plan-main,
+.exercise-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.training-plan-main strong,
+.exercise-summary-main strong {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--text);
+}
+.training-plan-main span,
+.exercise-summary-main span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.training-goal-pips,
+.exercise-goal-pips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 2px;
+}
+.training-goal-pip,
+.exercise-goal-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-dark);
+}
+.training-goal-pip.done,
+.exercise-goal-pip.done {
+  background: var(--sage);
+}
+.training-plan-day-strip,
+.exercise-day-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.training-plan-day,
+.exercise-day {
+  min-height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.training-plan-day.today,
+.exercise-day.today {
+  border-color: var(--sage);
+}
+.training-plan-day.done,
+.exercise-day.done {
+  background: rgba(45, 74, 62, 0.12);
+  color: var(--sage-dark);
+  border-color: rgba(45, 74, 62, 0.24);
+}
+.training-plan-day.rest {
+  background: transparent;
+  border-style: dashed;
+}
+.training-plan-day.future,
+.exercise-day.future {
+  opacity: 0.45;
+}
+.exercise-day.plan {
+  background: var(--sage);
+  color: white;
+  border-color: var(--sage);
+}
+.exercise-day.other {
+  background: var(--rose-light);
+  color: var(--rose);
+  border-color: var(--rose-light);
+}
+.training-plan-chips,
+.exercise-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.training-plan-chip,
+.exercise-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.training-plan-chip.done {
+  background: rgba(45, 74, 62, 0.1);
+  border-color: rgba(45, 74, 62, 0.24);
+  color: var(--text);
+}
+.training-plan-chip strong {
+  color: var(--sage);
+  font-weight: 600;
+}
+.exercise-chip.muted {
+  color: var(--text-light);
+}
+.training-plan-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.training-plan-note.good {
+  color: var(--sage);
+  font-weight: 600;
+}
+
+/* ── Exercise Summary Card ── */
+.exercise-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.exercise-summary-minutes {
+  text-align: right;
+}
+.exercise-summary-minutes strong {
+  display: block;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text);
+}
+.exercise-summary-minutes span {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.exercise-goal-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.exercise-goal-row strong {
+  color: var(--sage);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.exercise-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.exercise-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-right: 1px solid var(--border);
+}
+.exercise-stat:last-child {
+  border-right: none;
+}
+.exercise-stat strong {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+}
+.exercise-stat span {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.exercise-last-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.exercise-last-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+
 /* ── Split Coverage Chips ── */
 .split-chips-row {
   display: flex;
@@ -2591,6 +2817,20 @@ textarea.form-input {
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  input,
+  select,
+  textarea,
+  .form-input,
+  .settings-row-input,
+  .hc-name-input,
+  .hc-pts-select,
+  .mi-textarea,
+  .tbundle-text {
+    font-size: 16px;
+  }
 }
 
 /* ── Retro Split Note ── */

@@ -2867,6 +2867,7 @@ function renderWeek() {
   });
   html += `</div>`;
 
+  html += renderTrainingWeekCard(days, today, settings);
 
   // Weigh-in section
   if (!thisWeekWeighIn) {
@@ -3104,49 +3105,67 @@ function renderTrainingWeekCard(days, today, settings) {
   const remaining  = Math.max(0, target - completed);
   const daysLeft   = days.filter(d => d > today).length;
   const weekOver   = today > days[days.length - 1];
-  const DOW        = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dayLabels  = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const DOW        = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Smart context note
   let note;
   if (completed >= target) {
-    note = `<span style="color:var(--sage)">Target hit this week.</span>`;
+    note = 'Target hit this week.';
   } else if (weekOver) {
-    note = `Missed target this week. Reset Monday.`;
-  } else if (remaining === 0) {
-    note = `<span style="color:var(--sage)">Target hit this week.</span>`;
+    note = 'Missed target this week. Reset Monday.';
   } else if (remaining <= daysLeft) {
     note = daysLeft > remaining + 1
-      ? `On track.`
+      ? 'On track.'
       : `${remaining} session${remaining !== 1 ? 's' : ''} remaining, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left -- still on track.`;
   } else {
     note = `${remaining} session${remaining !== 1 ? 's' : ''} remaining, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left -- push this week.`;
   }
 
-  // Split rows: one row per configured split day
-  const splitRows = splitDays.map(sd => {
+  const goalPips = Array.from({ length: target }, (_, i) =>
+    `<span class="training-goal-pip${i < completed ? ' done' : ''}" aria-hidden="true"></span>`
+  ).join('');
+
+  const splitChips = splitDays.map(sd => {
     const done = summary.byDay[sd.id];
+    const dates = done?.dates || [];
     if (done) {
-      const dayLabels = done.dates.map(d => {
+      const doneLabels = dates.map(d => {
         const idx = days.indexOf(d);
-        return `<span style="color:var(--sage);font-weight:500">${DOW[idx] ?? d}</span> ✓`;
+        return DOW[idx] ?? formatDateShort(d);
       }).join(', ');
-      return `<div class="training-split-row"><span class="training-split-label">${escHtml(sd.name)}</span><span class="training-split-status done">${dayLabels}</span></div>`;
+      return `<span class="training-plan-chip done"><span>${escHtml(sd.name)}</span><strong>${escHtml(doneLabels)}</strong></span>`;
     }
-    return `<div class="training-split-row"><span class="training-split-label">${escHtml(sd.name)}</span><span class="training-split-status pending">not yet</span></div>`;
-  });
+    return `<span class="training-plan-chip"><span>${escHtml(sd.name)}</span><strong>not yet</strong></span>`;
+  }).join('');
+
+  const dayStrip = days.map((d, i) => {
+    const sel = summary.selections[d];
+    const isToday = d === today;
+    const isFuture = d > today;
+    const isRest = sel?.splitDay === 'rest';
+    const isDone = sel && !isRest;
+    const cls = ['training-plan-day', isToday ? 'today' : '', isFuture ? 'future' : '', isDone ? 'done' : '', isRest ? 'rest' : '']
+      .filter(Boolean).join(' ');
+    const label = sel
+      ? `${DOW[i]}: ${sel.splitDayName || sel.splitDay}`
+      : `${DOW[i]}: no plan session logged`;
+    return `<span class="${cls}" aria-label="${escHtml(label)}" title="${escHtml(label)}">${dayLabels[i]}</span>`;
+  }).join('');
 
   return `
-    <div class="card">
-      <div class="card-title">This Week's Training</div>
-      ${renderTrainingDayGrid(days, today, settings)}
-      <div class="training-split-rows">
-        ${splitRows.join('')}
+    <div class="card training-plan-card">
+      <div class="training-plan-head">
+        <div>
+          <div class="card-title">Training Plan</div>
+          <div class="training-plan-main"><strong>${completed}</strong><span>/ ${target} plan sessions</span></div>
+        </div>
+        <div class="training-goal-pips" aria-label="${completed} of ${target} plan sessions complete">${goalPips}</div>
       </div>
-      <div class="training-target-row">
-        <span>Target: <strong>${target} session${target !== 1 ? 's' : ''}</strong></span>
-        ${completed >= target ? '' : `<span class="text-muted" style="font-size:13px">${remaining} remaining</span>`}
+      <div class="training-plan-day-strip">${dayStrip}</div>
+      <div class="training-plan-chips">${splitChips}</div>
+      <div class="training-plan-note ${completed >= target ? 'good' : ''}">
+        ${completed >= target ? 'Target hit.' : `${remaining} remaining.`} ${note}
       </div>
-      <div class="training-context-note text-small" style="margin-top:6px;color:var(--text-muted)">${note}</div>
     </div>
   `;
 }
@@ -3217,19 +3236,27 @@ function getPillarFeedback(pillar, pct) {
 
 function renderExerciseThisWeek() {
   const settings   = Store.getSettings();
-  const workouts   = Store.getWorkouts();
+  const workouts   = Store.getWorkouts().slice().sort((a, b) => b.date.localeCompare(a.date));
   const ws         = getWeekStart();
   const wsStr      = dateStr(ws);
   const we         = new Date(ws); we.setDate(we.getDate() + 6);
   const weStr      = dateStr(we);
+  const today      = todayStr();
+  const monthStart = today.slice(0, 8) + '01';
   const target     = settings.weeklySessionTarget || 3;
   const splitDays  = getSplitDays(settings);
   const weekWorkouts = workouts
     .filter(w => w.date >= wsStr && w.date <= weStr)
     .sort((a, b) => a.date.localeCompare(b.date));
   const planSessions  = weekWorkouts.filter(w => w.priority);
-  const remaining     = Math.max(0, target - planSessions.length);
-  const targetHit     = planSessions.length >= target;
+  const otherSessions = weekWorkouts.filter(w => !w.priority);
+  const weekMinutes   = weekWorkouts.reduce((sum, w) => sum + (parseInt(w.duration, 10) || 0), 0);
+  const monthWorkouts = workouts.filter(w => w.date >= monthStart && w.date <= today);
+  const lastWorkout   = workouts[0] || null;
+  const lastWorkoutLabel = lastWorkout
+    ? `${formatDateShort(lastWorkout.date)} · ${lastWorkout.activityLabel || 'Workout'}`
+    : 'No workouts yet';
+  const remaining = Math.max(0, target - planSessions.length);
 
   const coverageMap = {};
   splitDays.forEach(sd => { coverageMap[sd.id] = []; });
@@ -3245,7 +3272,7 @@ function renderExerciseThisWeek() {
     }
   });
 
-  const chips = splitDays.map(sd => {
+  const planChips = splitDays.map(sd => {
     const sessions = coverageMap[sd.id] || [];
     const count    = sessions.length;
     const done     = count > 0;
@@ -3260,37 +3287,62 @@ function renderExerciseThisWeek() {
     `;
   }).join('');
 
-  const sessionCountHtml = targetHit
-    ? `<div class="exercise-week-target-hit">Target hit this week.</div>`
-    : `<div class="exercise-week-remaining">${planSessions.length} of ${target} sessions · <span>${remaining} remaining</span></div>`;
+  const goalPips = Array.from({ length: target }, (_, i) =>
+    `<span class="exercise-goal-pip${i < planSessions.length ? ' done' : ''}" aria-hidden="true"></span>`
+  ).join('');
 
-  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  let sessionListHtml = '';
-  if (weekWorkouts.length > 0) {
-    sessionListHtml = `<div class="exercise-session-list">`;
-    weekWorkouts.forEach(w => {
-      const d   = parseDate(w.date);
-      const dow = DOW[d.getDay() === 0 ? 6 : d.getDay() - 1];
-      const tag = w.splitDayName
-        ? `<span class="exercise-session-tag">${escHtml(w.splitDayName)}</span>`
-        : (w.priority ? `<span class="exercise-session-tag">Strength</span>` : '');
-      sessionListHtml += `
-        <div class="exercise-session-row">
-          <span class="exercise-session-dow">${dow}</span>
-          <span class="exercise-session-label">${escHtml(w.activityLabel || 'Workout')}${tag}</span>
-          <span class="exercise-session-meta">${w.duration} min</span>
-        </div>
-      `;
-    });
-    sessionListHtml += `</div>`;
-  }
+  const weekActivityCounts = weekWorkouts.reduce((map, w) => {
+    const key = w.activityLabel || 'Workout';
+    map[key] = (map[key] || 0) + 1;
+    return map;
+  }, {});
+  const topActivities = Object.entries(weekActivityCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3);
+  const topChips = topActivities.length
+    ? topActivities.map(([label, count]) => `<span class="exercise-chip">${escHtml(label)}${count > 1 ? ` ×${count}` : ''}</span>`).join('')
+    : '<span class="exercise-chip muted">No workouts this week</span>';
+
+  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const weekDays = getWeekDays(ws);
+  const dayStrip = weekDays.map((d, i) => {
+    const dayWorkouts = weekWorkouts.filter(w => w.date === d);
+    const hasPlan = dayWorkouts.some(w => w.priority);
+    const hasOther = dayWorkouts.some(w => !w.priority);
+    const cls = ['exercise-day', dayWorkouts.length ? 'done' : '', hasPlan ? 'plan' : '', hasOther && !hasPlan ? 'other' : '']
+      .filter(Boolean).join(' ');
+    const label = dayWorkouts.length
+      ? `${dayLabels[i]}: ${dayWorkouts.length} workout${dayWorkouts.length !== 1 ? 's' : ''}`
+      : `${dayLabels[i]}: no workout logged`;
+    return `<span class="${cls}" aria-label="${escHtml(label)}" title="${escHtml(label)}">${dayLabels[i]}</span>`;
+  }).join('');
 
   return `
-    <div class="card">
-      <div class="card-title">This Week</div>
-      <div class="split-chips-row">${chips}</div>
-      ${sessionCountHtml}
-      ${sessionListHtml}
+    <div class="card exercise-summary-card">
+      <div class="exercise-summary-head">
+        <div>
+          <div class="card-title">This Week</div>
+          <div class="exercise-summary-main"><strong>${weekWorkouts.length}</strong><span>workout${weekWorkouts.length !== 1 ? 's' : ''}</span></div>
+        </div>
+        <div class="exercise-summary-minutes"><strong>${weekMinutes}</strong><span>min</span></div>
+      </div>
+
+      <div class="exercise-goal-row">
+        <span>${planSessions.length} / ${target} plan sessions</span>
+        <div class="exercise-goal-pips" aria-label="${planSessions.length} of ${target} plan sessions complete">${goalPips}</div>
+        <strong>${remaining === 0 ? 'target hit' : `${remaining} left`}</strong>
+      </div>
+
+      <div class="exercise-stat-grid">
+        <div class="exercise-stat"><strong>${planSessions.length}</strong><span>plan</span></div>
+        <div class="exercise-stat"><strong>${otherSessions.length}</strong><span>other</span></div>
+        <div class="exercise-stat"><strong>${monthWorkouts.length}</strong><span>this month</span></div>
+      </div>
+
+      <div class="exercise-day-strip">${dayStrip}</div>
+      <div class="split-chips-row">${planChips}</div>
+      <div class="exercise-last-line"><span>Last</span><strong>${escHtml(lastWorkoutLabel)}</strong></div>
+      <div class="exercise-chip-row">${topChips}</div>
     </div>
   `;
 }
