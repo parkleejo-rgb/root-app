@@ -132,7 +132,7 @@ const BADGE_DEFINITIONS = [
 
 // Set your Google Cloud OAuth 2.0 client ID here to enable Sheets backup.
 // Create one at console.cloud.google.com → APIs & Services → Credentials.
-// Enable the Google Sheets API and add your app's origin to allowed JavaScript origins.
+// Enable the Google Sheets API, Google Drive API, and add your app's origin to allowed JavaScript origins.
 const GOOGLE_CLIENT_ID = '763862383625-3gpodcsd248v47k5f35oh2ptobendksu.apps.googleusercontent.com';
 
 // ─── Web Push config ──────────────────────────────────────────────────────────
@@ -361,6 +361,12 @@ const SYNC_STATE_KEYS = new Set([
   'root_sync_account',
   'root_sync_queue',
   'root_google_reauth_needed',
+]);
+
+const LOCAL_HOUSEKEEPING_KEYS = new Set([
+  'root_onboarding_complete',
+  'root_last_open_date',
+  'root_last_notification_check',
 ]);
 
 function getAppStateBackup() {
@@ -6643,6 +6649,7 @@ const SheetsSync = {
   setQueue(q) { localStorage.setItem('root_sync_queue', JSON.stringify(q)); },
 
   isConnected() { return !!(this.getStoredToken() && this.getSheetId()); },
+  hasStoredToken() { return !!this.getStoredToken(); },
 
   // ── App load init ─────────────────────────────────────────────────────────
 
@@ -6676,7 +6683,7 @@ const SheetsSync = {
     return new Promise((resolve, reject) => {
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/userinfo.email',
         callback: async (resp) => {
           if (resp.error) { reject(new Error(resp.error)); return; }
           const tokenData = {
@@ -6694,11 +6701,24 @@ const SheetsSync = {
             if (info.email) this.setAccount(info.email);
           } catch {}
           try {
-            const sheetId = await this._createSpreadsheet();
+            const existingSheet = await this._findExistingSpreadsheet();
+            const sheetId = existingSheet?.id || await this._createSpreadsheet();
             this.setSheetId(sheetId);
             localStorage.removeItem('root_google_reauth_needed');
-            await this.syncAll();
-            showToast('Backup connected. Your data is now syncing to Google Sheets in your Drive.', 'success');
+            const shouldRestoreExisting = existingSheet && !hasLocalData();
+            if (shouldRestoreExisting) {
+              await this.restoreAll();
+              Store.set('onboarding_complete', true);
+              updateHeader();
+            } else {
+              await this.syncAll();
+            }
+            const message = shouldRestoreExisting
+              ? `Backup connected. Your data was restored from ${existingSheet.name}.`
+              : existingSheet
+                ? `Backup connected to your existing ${existingSheet.name} spreadsheet.`
+                : 'Backup connected. Your data is now syncing to Google Sheets in your Drive.';
+            showToast(message, 'success');
             renderSettings();
             resolve();
           } catch(e) { reject(e); }
@@ -6776,6 +6796,7 @@ const SheetsSync = {
     });
     await gapi.client.init({});
     await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
+    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
   },
 
   // ── Offline queue ─────────────────────────────────────────────────────────
@@ -6798,7 +6819,45 @@ const SheetsSync = {
     if (daysSince > 7) localStorage.setItem('root_google_reauth_needed', '1');
   },
 
-  // ── Spreadsheet creation ──────────────────────────────────────────────────
+  // ── Spreadsheet discovery / creation ──────────────────────────────────────
+
+  async prepareRestoreConnection() {
+    const token = this.getStoredToken();
+    if (!token) return false;
+    try {
+      await this._ensureToken();
+      let sheetId = this.getSheetId();
+      if (!sheetId) {
+        const existingSheet = await this._findExistingSpreadsheet();
+        sheetId = existingSheet?.id || null;
+        if (sheetId) this.setSheetId(sheetId);
+      }
+      localStorage.removeItem('root_google_reauth_needed');
+      return !!sheetId;
+    } catch(e) {
+      if (e.message === 'Token expired' || (e.status && e.status === 401)) {
+        localStorage.setItem('root_google_reauth_needed', '1');
+      }
+      return false;
+    }
+  },
+
+  async _findExistingSpreadsheet() {
+    const names = ['Root Data', 'Bloom Data'];
+    for (const name of names) {
+      const escapedName = name.replace(/'/g, "\\'");
+      const resp = await gapi.client.drive.files.list({
+        q: `name='${escapedName}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+        fields: 'files(id,name,modifiedTime)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 10,
+        spaces: 'drive',
+      });
+      const files = resp.result.files || [];
+      if (files.length) return files[0];
+    }
+    return null;
+  },
 
   async _createSpreadsheet() {
     const resp = await gapi.client.sheets.spreadsheets.create({
@@ -7040,9 +7099,34 @@ const SheetsSync = {
 function hasLocalData() {
   if (Store.getWeighIns().length > 0) return true;
   if (Store.getWorkouts().length > 0) return true;
-  if (Store.getSettings().name) return true;
+  if (Store.getCardioLogs().length > 0) return true;
+  if (Store.getSleepLogs().length > 0) return true;
+  if (Store.getMoodLogs().length > 0) return true;
+  if (Store.getProgressPhotos().length > 0) return true;
+  if (Store.getMeasurements().length > 0) return true;
+  const savedSettings = Store.get('settings', null);
+  if (savedSettings && Object.keys(savedSettings).some(k => k !== 'appStartDate' && JSON.stringify(savedSettings[k]) !== JSON.stringify(DEFAULT_SETTINGS[k]))) return true;
+  const settings = Store.getSettings();
+  if (settings.name || settings.startingWeight || settings.goalWeightLow || settings.goalWeightHigh) return true;
+  const points = Store.getPoints();
+  if ((points.history || []).length > 0 || points.spendable > 0 || points.total_earned > 0) return true;
+  const goals = Store.getGoals();
+  if (goals.name || (goals.history || []).length > 0) return true;
+  if (Object.keys(Store.getBadges()).length > 0) return true;
+  if (Object.keys(Store.getWeeklyNotes()).some(k => Store.getWeeklyNotes()[k])) return true;
+  if (Object.keys(Store.getWeeklyIntentions()).some(k => Store.getWeeklyIntentions()[k])) return true;
+  if (Object.keys(Store.getTrainingSelections()).length > 0) return true;
   for (let i = 0; i < localStorage.length; i++) {
-    if (localStorage.key(i).startsWith('root_habits_')) return true;
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('root_')) continue;
+    if (SYNC_STATE_KEYS.has(key) || LOCAL_HOUSEKEEPING_KEYS.has(key)) continue;
+    if (key.startsWith('root_hint_seen_')) continue;
+    if (key.startsWith('root_habits_')) {
+      try {
+        const habits = JSON.parse(localStorage.getItem(key) || '{}');
+        if (Object.values(habits).some(Boolean)) return true;
+      } catch {}
+    }
   }
   return false;
 }
@@ -7068,6 +7152,7 @@ function showRestorePrompt() {
       await SheetsSync.restoreAll();
       overlay.remove();
       Store.set('onboarding_complete', true);
+      updateHeader();
       renderToday();
       showToast('Your data has been restored from Google Sheets.', 'success');
     } catch(e) {
@@ -7080,11 +7165,12 @@ function showRestorePrompt() {
   overlay.querySelector('#restore-fresh-btn').addEventListener('click', () => {
     openConfirm(
       'Start fresh?',
-      'This will permanently delete your Google Sheets backup. Are you sure?',
+      'This will disconnect this device from Google Sheets and start a fresh local setup. Your spreadsheet in Drive will not be deleted.',
       'Yes, Start Fresh',
       () => {
         SheetsSync.disconnect();
         overlay.remove();
+        renderToday();
         openOnboarding();
       },
       true
@@ -7118,16 +7204,16 @@ function init() {
   // Update header
   updateHeader();
 
-  // Render today screen
-  renderToday();
-
   // Onboarding, restore check, and Sheets init
   setTimeout(async () => {
-    // If Sheets is connected and local data is gone, offer restore
-    if (SheetsSync.isConnected() && !hasLocalData()) {
+    const hasData = hasLocalData();
+    if (!hasData && SheetsSync.hasStoredToken() && await SheetsSync.prepareRestoreConnection()) {
       showRestorePrompt();
       return;
     }
+
+    renderToday();
+
     if (Store.get('onboarding_complete')) {
       if (shouldShowSundayCheckin()) {
         setTimeout(openSundayCheckin, 600);
