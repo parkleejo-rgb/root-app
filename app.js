@@ -551,7 +551,7 @@ const Badges = {
     if (strengthCount >= 5)  award('strength_5');
     if (strengthCount >= 20) award('strength_20');
 
-    const cashouts = goals.history ? goals.history.length : 0;
+    const cashouts = (goals.history || []).filter(h => !h.abandoned).length;
     if (cashouts >= 1) award('first_cashout');
     if (cashouts >= 3) award('cashouts_3');
 
