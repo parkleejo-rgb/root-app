@@ -6726,7 +6726,7 @@ const SheetsSync = {
             if (info.email) this.setAccount(info.email);
           } catch {}
           try {
-            const savedSheetId = this.getSheetId();
+            const savedSheetId = await this._getValidStoredSheetId();
             let existingSheetId = null;
             try {
               existingSheetId = await this._findExistingSpreadsheet();
@@ -6792,6 +6792,7 @@ const SheetsSync = {
     try {
       await this._ensureToken();
       const id = this.getSheetId();
+      await this._ensureRootSpreadsheet(id);
       await this._syncWeighInsTab(id);
       await this._syncHabitsTab(id);
       await this._syncWorkoutsTab(id);
@@ -6866,6 +6867,10 @@ const SheetsSync = {
     try {
       await this._ensureToken();
       let sheetId = this.getSheetId();
+      if (sheetId && !await this._isRootSpreadsheet(sheetId)) {
+        this.setSheetId(null);
+        sheetId = null;
+      }
       if (!sheetId) {
         sheetId = await this._findExistingSpreadsheet();
         if (sheetId) this.setSheetId(sheetId);
@@ -6914,6 +6919,42 @@ const SheetsSync = {
     const files = body.files || [];
     const exact = files.find(file => file.name === GOOGLE_SHEETS_BACKUP_NAME);
     return (exact || files[0])?.id || null;
+  },
+
+  async _getSpreadsheetTitle(sheetId) {
+    if (!sheetId) return '';
+    const resp = await gapi.client.sheets.spreadsheets.get({
+      spreadsheetId: sheetId,
+      fields: 'properties.title',
+    });
+    return resp.result?.properties?.title || '';
+  },
+
+  async _isRootSpreadsheet(sheetId) {
+    try {
+      return await this._getSpreadsheetTitle(sheetId) === GOOGLE_SHEETS_BACKUP_NAME;
+    } catch {
+      return false;
+    }
+  },
+
+  async _ensureRootSpreadsheet(sheetId) {
+    const title = await this._getSpreadsheetTitle(sheetId);
+    if (title !== GOOGLE_SHEETS_BACKUP_NAME) {
+      this.setSheetId(null);
+      const err = new Error(`Stored Google Sheet is "${title || 'Untitled'}", not ${GOOGLE_SHEETS_BACKUP_NAME}`);
+      err.status = 409;
+      throw err;
+    }
+  },
+
+  async _getValidStoredSheetId() {
+    const sheetId = this.getSheetId();
+    if (!sheetId) return null;
+    if (await this._isRootSpreadsheet(sheetId)) return sheetId;
+    this.setSheetId(null);
+    this.setDriveSearchWarning(`The saved Google Sheets backup was not ${GOOGLE_SHEETS_BACKUP_NAME}, so Root ignored it and will look for the correct backup.`);
+    return null;
   },
 
   async _createSpreadsheet() {
@@ -7052,6 +7093,7 @@ const SheetsSync = {
     try {
       await this._ensureToken();
       const id = this.getSheetId();
+      await this._ensureRootSpreadsheet(id);
       const connectionState = {
         token: this.getStoredToken(),
         sheetId: id,
@@ -7190,6 +7232,9 @@ const SheetsSync = {
     }
     if (/permission|scope|insufficient/i.test(message)) {
       return 'Google permission was not granted.';
+    }
+    if (/not Root Data/i.test(message)) {
+      return message;
     }
 
     return message ? `${message.slice(0, 120)}.` : '';
