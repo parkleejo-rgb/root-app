@@ -2845,3 +2845,64 @@ textarea.form-input {
   padding: 1px 5px;
   vertical-align: middle;
 }
+
+/* ── Skip habit ─────────────────────────────────────────────────── */
+.habit-item.skipped {
+  opacity: 0.45;
+}
+.habit-item.skipped .habit-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.habit-skip-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-left: 4px;
+}
+.habit-item:hover .habit-skip-btn,
+.habit-item:focus-within .habit-skip-btn {
+  opacity: 1;
+}
+/* Always visible on touch devices (no hover) */
+@media (hover: none) {
+  .habit-skip-btn {
+    opacity: 0.55;
+  }
+}
+.habit-skip-undo {
+  /* Same size as habit-check-zone but shows a dash */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.habit-skip-dash {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.habit-skip-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: nowrap;
+}

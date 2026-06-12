@@ -203,8 +203,10 @@ const Store = {
   getSettings()   { return { ...DEFAULT_SETTINGS, ...this.get('settings', {}) }; },
   saveSettings(s) { this.set('settings', s); SheetsSync.schedule(); },
 
-  getHabits(date)      { return this.get('habits_' + date, {}); },
-  saveHabits(date, h)  { this.set('habits_' + date, h); SheetsSync.schedule(); },
+  getHabits(date)        { return this.get('habits_' + date, {}); },
+  saveHabits(date, h)    { this.set('habits_' + date, h); SheetsSync.schedule(); },
+  getSkipped(date)       { return this.get('skipped_' + date, {}); },
+  saveSkipped(date, s)   { this.set('skipped_' + date, s); },
 
   getWeighIns()        { return this.get('weighins', []); },
   saveWeighIns(a)      { this.set('weighins', a); SheetsSync.schedule(); },
@@ -585,13 +587,16 @@ const Streak = {
   },
   saveData(d) { Store.set('streak', d); },
 
-  // True if ≥5 of the (enabled) core habits are checked for that date
+  // True if ≥5 of the (enabled, non-skipped) core habits are checked for that date
   isStreakDay(date) {
     const checked    = Store.getHabits(date);
+    const skipped    = Store.getSkipped(date);
     const defs       = Store.getHabitDefs();
-    const coreActive = defs.filter(h => CORE_HABIT_IDS.includes(h.id) && h.enabled !== false);
+    // Exclude skipped core habits from the required pool
+    const coreActive = defs.filter(h => CORE_HABIT_IDS.includes(h.id) && h.enabled !== false && !skipped[h.id]);
     const done       = coreActive.filter(h => checked[h.id]).length;
-    return done >= 5;
+    const required   = Math.min(5, coreActive.length); // if fewer than 5 available, need all
+    return done >= required;
   },
 
   // Recompute streak from scratch (supports retroactive logging)
@@ -660,11 +665,13 @@ const Streak = {
     return data;
   },
 
-  // Returns how many core habits are done for a given date
+  // Returns how many core habits are done for a given date (skipped excluded from total)
   getCoreProgress(date) {
-    const checked    = Store.getHabits(date || todayStr());
+    const d          = date || todayStr();
+    const checked    = Store.getHabits(d);
+    const skipped    = Store.getSkipped(d);
     const defs       = Store.getHabitDefs();
-    const coreActive = defs.filter(h => CORE_HABIT_IDS.includes(h.id) && h.enabled !== false);
+    const coreActive = defs.filter(h => CORE_HABIT_IDS.includes(h.id) && h.enabled !== false && !skipped[h.id]);
     const done       = coreActive.filter(h => checked[h.id]).length;
     return { done, total: coreActive.length };
   },
@@ -2218,9 +2225,10 @@ function getNeglectedDays(habitId) {
   return days;
 }
 
-function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive, neglectDays) {
+function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive, neglectDays, skipped) {
   const id            = habit.id;
   const isChecked     = !!checked[id];
+  const isSkipped     = !!(skipped && skipped[id]);
   const bundleNote    = bundleEntry?.note    || null;
   const bundleSkipped = bundleEntry?.skipped || false;
   const extra         = habit.retroactive ? '<span class="text-small text-muted"> (for last night)</span>' : '';
@@ -2249,22 +2257,30 @@ function buildHabitItemHtml(habit, checked, isCore, bundleEntry, isPromptActive,
   const detailId = `habit-detail-${id}`;
   const promptDisabled = isPromptActive ? '' : ' disabled tabindex="-1"';
 
-  const itemCls = ['habit-item', isChecked ? 'checked' : '', isPromptActive ? 'has-prompt' : '', isNeglected ? 'habit-neglected' : '']
+  const itemCls = ['habit-item', isChecked ? 'checked' : '', isSkipped ? 'skipped' : '', isPromptActive ? 'has-prompt' : '', isNeglected ? 'habit-neglected' : '']
     .filter(Boolean).join(' ');
+
+  // Skipped state: show a muted "—" undo button instead of checkbox
+  const checkZone = isSkipped
+    ? `<button class="habit-check-zone habit-skip-undo" type="button" aria-label="Undo skip for ${escHtml(habit.label)}" title="Undo skip">
+         <span class="habit-skip-dash" aria-hidden="true">—</span>
+       </button>`
+    : `<button class="habit-check-zone" type="button" role="checkbox" aria-checked="${isChecked ? 'true' : 'false'}" aria-label="${isChecked ? 'Uncheck' : 'Check'} ${escHtml(habit.label)}">
+         <span class="habit-check" aria-hidden="true"></span>
+       </button>`;
 
   return `
     <div class="${itemCls}" data-habit="${id}" data-opens-workout="${habit.opensWorkout}" data-priority="${habit.priority}">
       <div class="habit-main-row">
         ${coreDot}
-        <button class="habit-check-zone" type="button" role="checkbox" aria-checked="${isChecked ? 'true' : 'false'}" aria-label="${isChecked ? 'Uncheck' : 'Check'} ${escHtml(habit.label)}">
-          <span class="habit-check" aria-hidden="true"></span>
-        </button>
+        ${checkZone}
         <button class="habit-tap-zone" type="button" ${hasDetailFinal ? `aria-expanded="false" aria-controls="${detailId}"` : ''}>
           <div class="habit-text">${escHtml(habit.label)}${extra}</div>
           ${workoutTag}
-          <div class="habit-points">${habit.points}pt${habit.points > 1 ? 's' : ''}</div>
-          ${hasDetailFinal ? `<svg class="habit-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>` : ''}
+          ${isSkipped ? `<span class="habit-skip-label">N/A today</span>` : `<div class="habit-points">${habit.points}pt${habit.points > 1 ? 's' : ''}</div>`}
+          ${hasDetailFinal && !isSkipped ? `<svg class="habit-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>` : ''}
         </button>
+        ${!isSkipped && !isChecked ? `<button class="habit-skip-btn" type="button" aria-label="Mark '${escHtml(habit.label)}' as not applicable today" title="Not applicable today">—</button>` : ''}
       </div>
       ${hasDetailFinal ? `<div class="habit-detail" id="${detailId}">${neglectHtml}${noteHtml}${rationaleHtml}${coreTagHtml}</div>` : ''}
       ${eligiblePrompt ? `
@@ -2380,6 +2396,7 @@ function renderToday() {
   const today     = todayStr();
   const viewDate  = viewingDate;
   const checked   = Store.getHabits(viewDate);
+  const skipped   = Store.getSkipped(viewDate);
   const habits    = Store.getHabitDefs().filter(h => h.enabled !== false);
 
   // Temptation bundling
@@ -2393,8 +2410,9 @@ function renderToday() {
   // Streak + core progress
   const streakData        = Streak.recompute();
   const { done: coreDone } = Streak.getCoreProgress(today);
-  const totalDone  = habits.filter(h => checked[h.id]).length;
-  const totalAll   = habits.length;
+  const activeHabits = habits.filter(h => !skipped[h.id]);
+  const totalDone  = activeHabits.filter(h => checked[h.id]).length;
+  const totalAll   = activeHabits.length;
   const nowHour    = new Date().getHours();
   const onTheLine  = nowHour >= 18 && coreDone < 5 && streakData.current > 0;
   const showStreakUI = viewDate === today;
@@ -2462,7 +2480,7 @@ function renderToday() {
         </div>
     `;
     coreHabits.forEach(h => {
-      html += buildHabitItemHtml(h, checked, true, bundleData[h.id] || null, promptHabitId === h.id, neglectMap[h.id]);
+      html += buildHabitItemHtml(h, checked, true, bundleData[h.id] || null, promptHabitId === h.id, neglectMap[h.id], skipped);
     });
     html += `</div>`;
   }
@@ -2474,19 +2492,20 @@ function renderToday() {
     const bonusItems = sortHabitsByPoints(allItems.filter(h => !CORE_HABIT_IDS.includes(h.id)));
     if (!bonusItems.length) return;
 
-    const pillarDone = allItems.filter(h => checked[h.id]).length;
+    const pillarDone    = allItems.filter(h => checked[h.id] && !skipped[h.id]).length;
+    const pillarActive  = allItems.filter(h => !skipped[h.id]).length;
 
     html += `
       <div class="habit-group">
         <div class="pillar-header">
           <div class="pillar-dot ${meta.dotClass}"></div>
           <div class="pillar-label">${meta.label}</div>
-          <div id="pillar-count-${pillar}" class="pillar-count">${pillarDone} of ${allItems.length} done</div>
+          <div id="pillar-count-${pillar}" class="pillar-count">${pillarDone} of ${pillarActive} done</div>
         </div>
     `;
 
     bonusItems.forEach(h => {
-      html += buildHabitItemHtml(h, checked, false, bundleData[h.id] || null, promptHabitId === h.id, neglectMap[h.id]);
+      html += buildHabitItemHtml(h, checked, false, bundleData[h.id] || null, promptHabitId === h.id, neglectMap[h.id], skipped);
     });
 
     html += `</div>`;
@@ -2506,11 +2525,23 @@ function renderToday() {
 
   // Habit events: check-zone → toggle, tap-zone → expand detail, prompt handlers
   screen.querySelectorAll('.habit-item').forEach(item => {
-    const id = item.dataset.habit;
+    const id     = item.dataset.habit;
+    const isCore = CORE_HABIT_IDS.includes(id);
 
-    // Checkbox zone: toggle check (train_plan gets split-picker instead)
+    // Skip button: mark habit as N/A for today
+    item.querySelector('.habit-skip-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      skipHabit(id, viewDate, isCore);
+    });
+
+    // Checkbox zone: toggle check (skipped items = undo skip; train_plan gets split-picker)
     item.querySelector('.habit-check-zone')?.addEventListener('click', e => {
       e.stopPropagation();
+      // If this is the undo-skip button (item is skipped)
+      if (item.classList.contains('skipped')) {
+        unskipHabit(id, viewDate);
+        return;
+      }
       if (id === 'train_plan') {
         const dateChecked = Store.getHabits(viewDate);
         if (!dateChecked['train_plan']) {
@@ -2603,6 +2634,44 @@ function updateStreakDisplay() {
     const el = document.getElementById(`pillar-count-${pillar}`);
     if (el) el.textContent = `${done} of ${items.length} done`;
   });
+}
+
+function skipHabit(id, date, isCore) {
+  const performSkip = () => {
+    // If habit was checked, remove the check and deduct points first
+    const checked = Store.getHabits(date);
+    if (checked[id]) {
+      const habits = Store.getHabitDefs();
+      const habit  = habits.find(h => h.id === id);
+      delete checked[id];
+      Store.saveHabits(date, checked);
+      if (habit) Points.deduct(habit.points, `Habit unchecked: ${habit.label}`, date);
+      updatePointsBadge();
+    }
+    const skipped = Store.getSkipped(date);
+    skipped[id] = true;
+    Store.saveSkipped(date, skipped);
+    Streak.recompute();
+    renderToday();
+    showToast('Marked as N/A today', 'info');
+  };
+
+  if (isCore) {
+    const streakData = Streak.getData();
+    const warning = streakData.current > 0
+      ? `Skipping a core habit may affect today's streak. Skip anyway?`
+      : `This is a core commitment. Skip it for today anyway?`;
+    if (!confirm(warning)) return;
+  }
+  performSkip();
+}
+
+function unskipHabit(id, date) {
+  const skipped = Store.getSkipped(date);
+  delete skipped[id];
+  Store.saveSkipped(date, skipped);
+  Streak.recompute();
+  renderToday();
 }
 
 function toggleHabit(item) {
@@ -3186,17 +3255,24 @@ function computePillarScores(activeDays, habits) {
     if (maxPerDay === 0) { scores[pillar] = 0; return; }
 
     let totalEarned = 0;
+    let totalPossible = 0;
     activeDays.forEach(day => {
       const checked = Store.getHabits(day);
+      const skipped = Store.getSkipped(day);
+      // Denominator shrinks for skipped habits
+      const dayMax =
+        primary.reduce((s, h)   => s + (skipped[h.id] ? 0 : h.weight), 0) +
+        secondary.reduce((s, h) => s + (skipped[h.id] ? 0 : (h.alsoWeight || h.weight)), 0);
+      totalPossible += dayMax;
       primary.forEach(h => {
-        if (checked[h.id]) totalEarned += h.weight;
+        if (checked[h.id] && !skipped[h.id]) totalEarned += h.weight;
       });
       secondary.forEach(h => {
-        if (checked[h.id]) totalEarned += (h.alsoWeight || h.weight);
+        if (checked[h.id] && !skipped[h.id]) totalEarned += (h.alsoWeight || h.weight);
       });
     });
 
-    scores[pillar] = totalEarned / (activeCount * maxPerDay);
+    scores[pillar] = totalPossible > 0 ? totalEarned / totalPossible : 0;
   });
 
   return scores;
