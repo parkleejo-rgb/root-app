@@ -1,6 +1,6 @@
 /* Root Service Worker — cache-first for offline PWA support */
 
-const CACHE = 'root-v10';
+const CACHE = 'root-v11';
 const ASSETS = [
   './',
   './index.html',

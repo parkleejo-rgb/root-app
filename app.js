@@ -1481,58 +1481,8 @@ const Notifications = {
     new Notification(title, { body, icon: './apple-touch-icon.png' });
   },
 
-  // Called on app open and visibility change — fires any pending notifications for today
-  checkPending() {
-    const s = Store.getSettings();
-    if (!s.featNotifications) return;
-    const now   = new Date();
-    const hour  = now.getHours();
-    const min   = now.getMinutes();
-    const today = todayStr();
-    const fired = Store.get('notif_fired_' + today, {});
-
-    // Streak protection — 7pm
-    if (s.notifStreakProtection && !fired.streakProtection && hour >= 19) {
-      const streak = Streak.recompute();
-      if (streak.current > 0) {
-        const { done: coreDone } = Streak.getCoreProgress(today);
-        if (coreDone < 5) {
-          this.show('Root', `Your ${streak.current}-day streak is on the line. You've got time.`);
-          fired.streakProtection = true;
-        }
-      }
-    }
-
-    // Weigh-in reminder — Sunday 9am
-    if (s.notifWeighIn && !fired.weighIn && now.getDay() === 0 && hour >= 9) {
-      const ws  = dateStr(getWeekStart());
-      const has = Store.getWeighIns().some(w => w.date >= ws);
-      if (!has) {
-        this.show('Root', "Weekly weigh-in -- log it while you're thinking about it.");
-        fired.weighIn = true;
-      }
-    }
-
-    // Bedtime nudge — 10pm
-    if (s.notifBedtime && !fired.bedtime && hour >= 22) {
-      const checked = Store.getHabits(today);
-      if (!checked['sleep_bed']) {
-        this.show('Root', "Bedtime habit -- 30 minutes to your target.");
-        fired.bedtime = true;
-      }
-    }
-
-    // Morning check-in — user-set time
-    if (s.notifMorningCheckin && !fired.morningCheckin && s.notifMorningTime) {
-      const [th, tm] = s.notifMorningTime.split(':').map(Number);
-      if (hour > th || (hour === th && min >= tm)) {
-        this.show('Root', "How's your morning going? Log your habits.");
-        fired.morningCheckin = true;
-      }
-    }
-
-    if (Object.keys(fired).length) Store.set('notif_fired_' + today, fired);
-  },
+  // Scheduled push notifications are sent by the push worker. The app should
+  // not fire catch-up notifications on open, or users can receive duplicates.
 };
 
 /* ─── Web Push Module ────────────────────────────────────────────────────────
@@ -7411,11 +7361,6 @@ function init() {
   // Update header message daily
   setInterval(updateHeader, 60 * 60 * 1000);
 
-  // Check pending notifications on load and on visibility change
-  setTimeout(() => Notifications.checkPending(), 2000);
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) Notifications.checkPending();
-  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
